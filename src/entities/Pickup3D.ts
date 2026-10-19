@@ -74,15 +74,37 @@ export class Pickup3D {
       ringMesh.position.y = -0.25;
       this.mesh.add(ringMesh);
     } else {
-      // Health / Armor Pack
-      const packGeom = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+      // Tactical First Aid Medical Kit (Red Case with 3D White Cross)
+      const packGeom = new THREE.BoxGeometry(0.55, 0.42, 0.38);
       const packMat = new THREE.MeshStandardMaterial({
-        color: 0xef4444,
-        emissive: 0xdc2626,
-        emissiveIntensity: 2.2,
+        color: 0xdc2626,
+        emissive: 0x991b1b,
+        emissiveIntensity: 1.8,
+        roughness: 0.3,
+        metalness: 0.3,
       });
       const packMesh = new THREE.Mesh(packGeom, packMat);
       this.mesh.add(packMesh);
+
+      // White Medical Cross (Horizontal + Vertical bars)
+      const crossMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.10, 0.40), crossMat);
+      this.mesh.add(crossH);
+      const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.32, 0.40), crossMat);
+      this.mesh.add(crossV);
+
+      // Glowing Ground Ring
+      const ringGeom = new THREE.RingGeometry(0.45, 0.72, 16);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xef4444,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.75,
+      });
+      const ringMesh = new THREE.Mesh(ringGeom, ringMat);
+      ringMesh.rotation.x = Math.PI * 0.5;
+      ringMesh.position.y = -0.24;
+      this.mesh.add(ringMesh);
     }
 
     // Floating 3D Billboard Sprite Label (Visible across entire screen and zoom levels)
@@ -96,7 +118,7 @@ export class Pickup3D {
     lCtx.textBaseline = 'middle';
     lCtx.shadowColor = '#000000';
     lCtx.shadowBlur = 8;
-    lCtx.fillText(type === 'cash' ? '₦ CASH' : (type === 'weapon' ? '📦 WEAPON' : '❤️ HP'), 80, 24);
+    lCtx.fillText(type === 'cash' ? '₦ CASH' : (type === 'weapon' ? '📦 WEAPON' : '❤️ +50 HP'), 80, 24);
 
     const labelTex = new THREE.CanvasTexture(labelCanvas);
     const spriteMat = new THREE.SpriteMaterial({ map: labelTex, transparent: true, opacity: 0.95 });

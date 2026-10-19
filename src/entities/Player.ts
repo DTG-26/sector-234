@@ -27,6 +27,7 @@ export class Player {
   public fireCooldown: number = 0;
   public reloadTimer: number = 0;
   public meleeTimer: number = 0;
+  public healthRegenDelay: number = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -112,6 +113,7 @@ export class Player {
     }
 
     this.stats.hp = Math.max(0, this.stats.hp - amount);
+    this.healthRegenDelay = 3.5; // Reset 3.5s cooldown before health regeneration begins
     this.syncStatusBillboard();
 
     if (this.stats.hp <= 0) {
@@ -119,6 +121,12 @@ export class Player {
       return true;
     }
     return false;
+  }
+
+  public heal(amount: number): void {
+    if (this.stats.isDead) return;
+    this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + amount);
+    this.syncStatusBillboard();
   }
 
   public eliminate(attacker?: Player): void {
@@ -143,6 +151,7 @@ export class Player {
     this.actor.isDead = false;
     this.stats.isDead = false;
     this.respawnTimer = 0;
+    this.healthRegenDelay = 0;
     this.stats.hp = this.stats.maxHp;
     this.stats.armor = this.stats.maxArmor;
     this.jetFuel = this.maxJetFuel;
@@ -285,6 +294,17 @@ export class Player {
     // Jet fuel regeneration when on ground
     if (this.actor.isGrounded && this.jetFuel < this.maxJetFuel) {
       this.jetFuel = Math.min(this.maxJetFuel, this.jetFuel + dt * 45.0);
+    }
+
+    // Health Regeneration: after 3.5s without taking damage, smoothly regenerate HP (+18 HP/s)
+    if (this.healthRegenDelay > 0) {
+      this.healthRegenDelay -= dt;
+    } else if (this.stats.hp < this.stats.maxHp) {
+      const prevHp = this.stats.hp;
+      this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + dt * 18.0);
+      if (Math.floor(prevHp) !== Math.floor(this.stats.hp)) {
+        this.syncStatusBillboard();
+      }
     }
 
     // Cooldown timers

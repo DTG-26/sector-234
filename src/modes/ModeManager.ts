@@ -146,6 +146,8 @@ export class ModeManager {
             { x: 14, y: 28.5, type: 'cash' as const }, // Commercial roof
             { x: 26, y: 22.5, type: 'weapon' as const, wId: WeaponId.SHOTGUN_AA12 },
             { x: 50, y: 22.5, type: 'weapon' as const, wId: WeaponId.BUNKER_RPG },
+            { x: 44, y: 15.5, type: 'health' as const }, // Lagos flyover health station
+            { x: 12, y: 8.5, type: 'health' as const },  // Street level medkit
           ]
         : [
             { x: 10, y: 13.5, type: 'cash' as const }, // Left Mud compound roof
@@ -157,6 +159,8 @@ export class ModeManager {
             { x: 40, y: 27.5, type: 'cash' as const }, // High terrace
             { x: 18, y: 13.5, type: 'weapon' as const, wId: WeaponId.BUNKER_RPG },
             { x: 62, y: 25.5, type: 'weapon' as const, wId: WeaponId.VULCAN_MINIGUN },
+            { x: 40, y: 8.5, type: 'health' as const },  // Center shrine medkit
+            { x: 72, y: 18.5, type: 'health' as const }, // High gate health station
           ];
 
     initialPickups.forEach((p) => {
@@ -227,6 +231,10 @@ export class ModeManager {
           player.stats.primaryWeapon = pk.weaponId;
           player.stats.activeWeapon = pk.weaponId;
           player.mesh.setWeapon(pk.weaponId);
+          onAudioChime();
+        } else if (pk.type === 'health') {
+          player.heal(50);
+          onAudioChime();
         }
       }
     }
