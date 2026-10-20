@@ -100,6 +100,7 @@ const startMatch = (opts: MenuStartOptions) => {
     if (opts.secondaryWeapon) {
       localPlayer.stats.secondaryWeapon = opts.secondaryWeapon;
     }
+    engine.cameraSystem.setWeaponProfile(localPlayer.stats.activeWeapon);
   }
   isGameActive = true;
 };
@@ -161,7 +162,8 @@ engine.onUpdate((dt: number) => {
         localPlayer,
         tileMap,
         effectiveAimAngle,
-        input.state.moveX
+        input.state.moveX,
+        engine.cameraSystem
       );
       if (res.activated) {
         audio.playThrusterWhoosh();
@@ -236,7 +238,7 @@ engine.onUpdate((dt: number) => {
           hud.addDamagePopup(target.actor.position.x, target.actor.position.y + 2.0, 'BOUNTY STEAL! +₦50,000', '#10b981', 24);
           modeManager.handlePlayerElimination(target, playerRef);
         }
-      });
+      }, tileMap);
 
       // Check if Cutlass lunge hits Central Vault door (4.8m radius)
       const distVault = Math.hypot(localPlayer.actor.position.x - 40, localPlayer.actor.position.y - 3.5);
@@ -253,7 +255,13 @@ engine.onUpdate((dt: number) => {
 
     // Weapon Firing
     if (input.state.firing) {
-      const fired = weaponSystem.fireWeapon(localPlayer, effectiveAimAngle);
+      const fired = weaponSystem.fireWeapon(
+        localPlayer,
+        effectiveAimAngle,
+        modeManager.players,
+        (victim, killer) => modeManager.handlePlayerElimination(victim, killer),
+        tileMap
+      );
       if (fired) {
         const weaponId = localPlayer.stats.activeWeapon;
         if (weaponId === WeaponId.SHOTGUN_AA12 || weaponId === WeaponId.RAIL_SNIPER) {
@@ -278,6 +286,7 @@ engine.onUpdate((dt: number) => {
     // Weapon Swap & Reload
     if (input.state.swapWeapon) {
       localPlayer.swapWeapon();
+      engine.cameraSystem.setWeaponProfile(localPlayer.stats.activeWeapon);
     }
     if (input.state.reload) {
       localPlayer.reloadWeapon();
@@ -323,6 +332,7 @@ engine.onUpdate((dt: number) => {
   });
 
   // Camera Follow, Aim-Shift, and Velocity-Zoom (with proximity deadzone to eliminate feedback glitch)
+  engine.cameraSystem.setWeaponProfile(localPlayer.stats.activeWeapon);
   engine.cameraSystem.setFollowTarget(localPlayer.actor.position.x, localPlayer.actor.position.y + 0.95);
   
   let aimShiftStrength = 1.0;
@@ -337,11 +347,9 @@ engine.onUpdate((dt: number) => {
     aimShiftStrength = Math.min(1.0, Math.max(0, (rDist - 15) / 35));
   }
 
-  const isHoldingSniper = localPlayer.stats.activeWeapon === WeaponId.RAIL_SNIPER;
   engine.cameraSystem.setAimShift(
     Math.cos(input.state.aimAngle) * aimShiftStrength,
-    Math.sin(input.state.aimAngle) * aimShiftStrength,
-    isHoldingSniper
+    Math.sin(input.state.aimAngle) * aimShiftStrength
   );
 
   const speed = Math.abs(localPlayer.actor.velocity.x);

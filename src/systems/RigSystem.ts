@@ -6,6 +6,7 @@ import { PlayerMesh3D } from '../entities/PlayerMesh3D';
 import { TileMap3D } from '../world/TileMap3D';
 
 import { Player } from '../entities/Player';
+import type { Camera3D } from '../core/Camera3D';
 
 export class RigSystem {
   public scene: THREE.Scene;
@@ -35,20 +36,21 @@ export class RigSystem {
     player: Player,
     tileMap: TileMap3D,
     aimAngle: number,
-    moveDirX: number
+    moveDirX: number,
+    camera?: Camera3D
   ): { activated: boolean; popupText: string } {
     switch (player.stats.rigType) {
       case MovementRigType.BREACH_BOOSTER:
-        return this.activateBreachBooster(player, tileMap, aimAngle, moveDirX);
+        return this.activateBreachBooster(player, tileMap, aimAngle, moveDirX, camera);
 
       case MovementRigType.OVERDRIVE_SLIDE:
-        return this.activateOverdriveSlide(player, aimAngle, moveDirX);
+        return this.activateOverdriveSlide(player, aimAngle, moveDirX, camera);
 
       case MovementRigType.PHASE_DASH:
-        return this.activatePhaseDash(player, tileMap, aimAngle, moveDirX);
+        return this.activatePhaseDash(player, tileMap, aimAngle, moveDirX, camera);
 
       case MovementRigType.GLITCH_ANCHOR:
-        return this.activateGlitchAnchor(player);
+        return this.activateGlitchAnchor(player, camera);
 
       default:
         return { activated: false, popupText: '' };
@@ -59,7 +61,8 @@ export class RigSystem {
     player: Player,
     tileMap: TileMap3D,
     aimAngle: number,
-    moveDirX: number
+    moveDirX: number,
+    camera?: Camera3D
   ): { activated: boolean; popupText: string } {
     const facing = player.mesh.rootGroup.scale.x >= 0 ? 1 : -1;
     const dirX = Math.abs(moveDirX) > 0.1
@@ -72,17 +75,27 @@ export class RigSystem {
     player.rigBoostTimer = 0.45;
     player.mesh.triggerThrusterBurst(true);
 
+    if (camera) {
+      camera.triggerBreachZoom();
+    }
+
     // Breach through up to 4 destructible tiles along movement path
     const checkX = Math.round(player.actor.position.x + dirX * 1.2);
     const checkY = Math.round(player.actor.position.y);
 
+    let destroyedWall = false;
     for (let step = 0; step < 4; step++) {
       const tx = checkX + Math.round(dirX * step);
       const ty = checkY;
       const t = tileMap.getTile(tx, ty);
       if (t === TileType.BRICK_CONCRETE || t === TileType.WOOD_SCAFFOLD || t === TileType.GLASS_WINDOW) {
         tileMap.destroyTile(tx, ty);
+        destroyedWall = true;
       }
+    }
+
+    if (destroyedWall && camera) {
+      camera.addTrauma(0.25);
     }
 
     setTimeout(() => {
@@ -95,7 +108,8 @@ export class RigSystem {
   private activateOverdriveSlide(
     player: Player,
     aimAngle: number,
-    moveDirX: number
+    moveDirX: number,
+    camera?: Camera3D
   ): { activated: boolean; popupText: string } {
     const facing = player.mesh.rootGroup.scale.x >= 0 ? 1 : -1;
     const dir = moveDirX !== 0
@@ -108,6 +122,13 @@ export class RigSystem {
     player.rigBoostTimer = 0.45;
     player.mesh.triggerThrusterBurst(true);
 
+    if (camera) {
+      camera.triggerSlideZoom(true);
+      setTimeout(() => {
+        camera.triggerSlideZoom(false);
+      }, 600);
+    }
+
     setTimeout(() => {
       player.mesh.triggerThrusterBurst(false);
     }, 450);
@@ -119,7 +140,8 @@ export class RigSystem {
     player: Player,
     tileMap: TileMap3D,
     aimAngle: number,
-    moveDirX: number
+    moveDirX: number,
+    camera?: Camera3D
   ): { activated: boolean; popupText: string } {
     const facing = player.mesh.rootGroup.scale.x >= 0 ? 1 : -1;
     const dirX = Math.abs(moveDirX) > 0.1
@@ -135,6 +157,10 @@ export class RigSystem {
     player.actor.velocity.set(dirX * 14.0, 6.0, 0);
     player.actor.isPhasing = true;
     player.rigBoostTimer = 0.35;
+
+    if (camera) {
+      camera.triggerPhaseSnap(targetX, targetY);
+    }
 
     player.mesh.rootGroup.traverse((obj) => {
       if ((obj as THREE.Mesh).material) {
@@ -157,7 +183,7 @@ export class RigSystem {
     return { activated: true, popupText: '⚡ PHASE DASH!' };
   }
 
-  private activateGlitchAnchor(player: Player): { activated: boolean; popupText: string } {
+  private activateGlitchAnchor(player: Player, camera?: Camera3D): { activated: boolean; popupText: string } {
     if (!this.glitchAnchorPos) {
       // Drop anchor
       this.glitchAnchorPos = player.actor.position.clone();
@@ -174,6 +200,9 @@ export class RigSystem {
       player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + 40);
       this.glitchAnchorPos = null;
       if (this.anchorMesh) this.anchorMesh.visible = false;
+      if (camera) {
+        camera.triggerAnchorSlingshot();
+      }
       return { activated: true, popupText: '⏪ GLITCH RECALL (+40 HP)!' };
     }
   }

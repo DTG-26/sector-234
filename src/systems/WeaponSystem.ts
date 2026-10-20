@@ -24,11 +24,53 @@ export class WeaponSystem {
     this.audio = audio;
   }
 
-  public fireWeapon(player: Player, aimAngle: number): boolean {
+  public fireWeapon(
+    player: Player,
+    aimAngle: number,
+    allPlayers?: Player[],
+    onElimination?: (victim: Player, killer: Player) => void,
+    tileMap?: TileMap3D
+  ): boolean {
     if (player.stats.isDead || player.fireCooldown > 0 || player.reloadTimer > 0) return false;
 
     const weaponDef = WEAPON_REGISTRY[player.stats.activeWeapon];
-    const currentAmmo = player.stats.ammo[weaponDef.id];
+
+    // Special Handling: Berserker Melee (Takobin Kano)
+    if (weaponDef.id === WeaponId.CUTLASS) {
+      player.fireCooldown = weaponDef.fireInterval;
+      this.audio.playMeleeSwish();
+
+      player.performMeleeLunge(aimAngle, allPlayers, (target, dmg) => {
+        const died = target.takeDamage(dmg, player);
+        this.audio.playGunshot('saw');
+        this.particles.spawnSparks(target.actor.position.x, target.actor.position.y + 1.0, 5, 5, 12);
+        if (this.onDamageDealt) {
+          this.onDamageDealt(target.actor.position.x, target.actor.position.y + 1.5, `SLICED -${dmg}!`, '#f59e0b');
+        }
+        if (died) {
+          player.stats.cash += 50000;
+          if (this.onDamageDealt) {
+            this.onDamageDealt(target.actor.position.x, target.actor.position.y + 2.0, 'BOUNTY STEAL! +₦50,000', '#10b981');
+          }
+          if (onElimination) onElimination(target, player);
+        }
+      }, tileMap);
+
+      // Check if Cutlass lunge hits Central Vault door
+      const distVault = Math.hypot(player.actor.position.x - 40, player.actor.position.y - 3.5);
+      if (distVault < 4.8 && this.onVaultHit) {
+        this.onVaultHit(150);
+        this.audio.playGunshot('saw');
+        this.particles.spawnSparks(40, 3.5, 0, 1, 15);
+        if (this.onDamageDealt) {
+          this.onDamageDealt(40, 5.0, 'VAULT MELEE BREACH -150!', '#f59e0b');
+        }
+      }
+
+      return true;
+    }
+
+    const currentAmmo = player.stats.ammo[weaponDef.id] ?? 0;
 
     if (currentAmmo <= 0) {
       player.reloadWeapon();

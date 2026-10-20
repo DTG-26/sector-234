@@ -1,24 +1,35 @@
 import * as THREE from 'three';
 import { ARENA_CONFIG } from '../config/constants';
+import { WeaponId } from '../config/types';
 
 export enum CameraZoomMode {
-  CLOSE = 0,   // Tight 1x: Close, prominent commandos
-  MEDIUM = 1,  // Balanced 2x: Mini Militia tactical standard
-  WIDE = 2,    // Overview 3x: Long-range sniper view
+  AUTO = 0,    // Dynamic Weapon-Driven Zoom (Berserker / CQB / Tactical / Heavy / Sniper)
+  CLOSE = 1,   // Manual Close 1x
+  WIDE = 2,    // Manual Wide 3x
 }
 
 export class Camera3D {
   public camera: THREE.PerspectiveCamera;
   public targetPosition: THREE.Vector3 = new THREE.Vector3(40, 25, 0);
-  public currentPosition: THREE.Vector3 = new THREE.Vector3(40, 25, 16.5);
+  public currentPosition: THREE.Vector3 = new THREE.Vector3(40, 25, 18.0);
   public aimOffset: THREE.Vector2 = new THREE.Vector2(0, 0);
   public targetAimOffset: THREE.Vector2 = new THREE.Vector2(0, 0);
   public speedZoom: number = 0; // 0 to 1
   public targetSpeedZoom: number = 0;
   public isMobile: boolean = false;
   
-  // Switchable Zoom Level (Default to Close 1x so characters look big and clear!)
-  public zoomMode: CameraZoomMode = CameraZoomMode.CLOSE;
+  // Weapon Profile Parameters
+  public activeWeapon: WeaponId = WeaponId.RIFLE_XAG47;
+  public weaponTargetZ: number = 18.0;
+  public weaponAimLead: number = 4.5;
+  public weaponSpeedZoomMult: number = 1.0;
+
+  // Tactical Rig Overrides
+  public breachPullbackTimer: number = 0;
+  public isSlideActive: boolean = false;
+
+  // Switchable Zoom Level (Default to AUTO for weapon-driven playstyles)
+  public zoomMode: CameraZoomMode = CameraZoomMode.AUTO;
 
   // Trauma-based 3D screen shake
   private trauma: number = 0;
@@ -27,32 +38,103 @@ export class Camera3D {
 
   constructor(aspect: number) {
     this.isMobile = window.innerWidth <= 900 || ('ontouchstart' in window);
-    const baseZ = this.getBaseZ();
+    this.setWeaponProfile(WeaponId.RIFLE_XAG47);
 
+    const initialZ = this.getBaseZ();
     this.camera = new THREE.PerspectiveCamera(
       ARENA_CONFIG.CAMERA_FOV,
       aspect,
       0.1,
       250.0
     );
-    this.camera.position.set(40, 25, baseZ);
-    this.currentPosition.set(40, 25, baseZ);
+    this.camera.position.set(40, 25, initialZ);
+    this.currentPosition.set(40, 25, initialZ);
     this.camera.lookAt(40, 25, 0);
   }
 
+  /**
+   * Automatically adapts camera distance, aim lookahead, and speed-zoom to active weapon
+   */
+  public setWeaponProfile(weaponId: WeaponId): void {
+    this.activeWeapon = weaponId;
+
+    switch (weaponId) {
+      // 1. Berserker Melee Archetype (Takobin Kano Knife) - Ultra-tight visceral combat framing
+      case WeaponId.CUTLASS:
+        this.weaponTargetZ = this.isMobile ? 11.5 : 13.5;
+        this.weaponAimLead = 2.2;
+        this.weaponSpeedZoomMult = 1.25;
+        break;
+
+      // 2. Close-Quarters Archetype (Shotgun AA-12, Akimbo Uzis, Ghost SMG) - Action zoom
+      case WeaponId.SHOTGUN_AA12:
+      case WeaponId.AKIMBO_UZIS:
+      case WeaponId.GHOST_SMG:
+        this.weaponTargetZ = this.isMobile ? 14.5 : 16.5;
+        this.weaponAimLead = 3.6;
+        this.weaponSpeedZoomMult = 1.15;
+        break;
+
+      // 3. Tactical Spec-Ops Archetype (XAG-47, Judge, Pistol, Shock-Arc) - Balanced framing
+      case WeaponId.RIFLE_XAG47:
+      case WeaponId.REVOLVER_JUDGE:
+      case WeaponId.PISTOL_XAG9:
+      case WeaponId.SHOCK_ARC:
+        this.weaponTargetZ = this.isMobile ? 15.5 : 18.0;
+        this.weaponAimLead = 4.5;
+        this.weaponSpeedZoomMult = 1.0;
+        break;
+
+      // 4. Heavy Artillery Archetype (Bunker RPG, Vulcan Minigun, Ricochet Saw) - Overview
+      case WeaponId.BUNKER_RPG:
+      case WeaponId.VULCAN_MINIGUN:
+      case WeaponId.RICOCHET_SAW:
+        this.weaponTargetZ = this.isMobile ? 17.5 : 20.5;
+        this.weaponAimLead = 5.2;
+        this.weaponSpeedZoomMult = 0.85;
+        break;
+
+      // 5. Long-Range Recon Archetype (Rail-Sniper) - Eagle-eye marksman view
+      case WeaponId.RAIL_SNIPER:
+        this.weaponTargetZ = this.isMobile ? 22.0 : 25.5;
+        this.weaponAimLead = 7.5;
+        this.weaponSpeedZoomMult = 0.70;
+        break;
+
+      default:
+        this.weaponTargetZ = this.isMobile ? 15.5 : 18.0;
+        this.weaponAimLead = 4.5;
+        this.weaponSpeedZoomMult = 1.0;
+        break;
+    }
+  }
+
+  // Tactical Rig Camera Triggers
+  public triggerBreachZoom(): void {
+    this.breachPullbackTimer = 0.45;
+  }
+
+  public triggerSlideZoom(active: boolean): void {
+    this.isSlideActive = active;
+  }
+
+  public triggerPhaseSnap(destX: number, destY: number): void {
+    this.currentPosition.x = destX;
+    this.currentPosition.y = destY;
+    this.addTrauma(0.08);
+  }
+
+  public triggerAnchorSlingshot(): void {
+    this.addTrauma(0.18);
+  }
+
   public getBaseZ(): number {
-    if (this.isMobile) {
-      switch (this.zoomMode) {
-        case CameraZoomMode.CLOSE: return 14.5;
-        case CameraZoomMode.MEDIUM: return 18.5;
-        case CameraZoomMode.WIDE: return 23.5;
-      }
+    if (this.zoomMode === CameraZoomMode.AUTO) {
+      return this.weaponTargetZ;
+    } else if (this.zoomMode === CameraZoomMode.CLOSE) {
+      return this.isMobile ? 13.0 : 15.0;
     } else {
-      switch (this.zoomMode) {
-        case CameraZoomMode.CLOSE: return 16.5;
-        case CameraZoomMode.MEDIUM: return 20.5;
-        case CameraZoomMode.WIDE: return 26.0;
-      }
+      return this.isMobile ? 22.0 : 26.0;
     }
   }
 
@@ -63,8 +145,8 @@ export class Camera3D {
 
   public getZoomLabel(): string {
     switch (this.zoomMode) {
+      case CameraZoomMode.AUTO: return '🔍 DYN';
       case CameraZoomMode.CLOSE: return '🔍 1x';
-      case CameraZoomMode.MEDIUM: return '🔍 2x';
       case CameraZoomMode.WIDE: return '🔍 3x';
     }
   }
@@ -79,14 +161,18 @@ export class Camera3D {
     this.targetPosition.set(x, y, 0);
   }
 
-  public setAimShift(dirX: number, dirY: number, isSniper: boolean = false): void {
-    // Mini Militia camera lookahead: peek in the direction you aim
-    const distance = isSniper ? 6.5 : 3.8;
-    this.targetAimOffset.set(dirX * distance, dirY * distance * 0.7);
+  public setAimShift(dirX: number, dirY: number): void {
+    // Weapon-specific lookahead peek lead
+    const leadDistance = this.weaponAimLead;
+    const upwardBias = this.activeWeapon === WeaponId.BUNKER_RPG ? 0.35 : 0.0;
+    this.targetAimOffset.set(
+      dirX * leadDistance,
+      (dirY + upwardBias) * leadDistance * 0.72
+    );
   }
 
   public setSpeedZoom(boostIntensity: number): void {
-    this.targetSpeedZoom = THREE.MathUtils.clamp(boostIntensity, 0, 1);
+    this.targetSpeedZoom = THREE.MathUtils.clamp(boostIntensity * this.weaponSpeedZoomMult, 0, 1);
   }
 
   public addTrauma(amount: number): void {
@@ -94,24 +180,36 @@ export class Camera3D {
   }
 
   public update(dt: number): void {
-    const baseZ = this.getBaseZ();
+    let baseZ = this.getBaseZ();
+    let offsetY = 0;
 
-    // 1. Smoothly interpolate aim offset (elastic Mini Militia camera peek)
-    this.aimOffset.lerp(this.targetAimOffset, Math.min(dt * 5.5, 1.0));
+    // Tactical Rig overrides
+    if (this.breachPullbackTimer > 0) {
+      this.breachPullbackTimer -= dt;
+      baseZ = Math.max(baseZ, this.isMobile ? 18.5 : 21.5);
+    }
+
+    if (this.isSlideActive) {
+      baseZ = this.isMobile ? 12.5 : 14.5;
+      offsetY = -0.65;
+    }
+
+    // 1. Smoothly interpolate aim offset (weapon-specific peek lead)
+    this.aimOffset.lerp(this.targetAimOffset, Math.min(dt * 6.0, 1.0));
 
     // 2. Smoothly interpolate speed zoom
-    this.speedZoom = THREE.MathUtils.lerp(this.speedZoom, this.targetSpeedZoom, Math.min(dt * 3.0, 1.0));
-    const targetZ = baseZ + this.speedZoom * 3.0;
+    this.speedZoom = THREE.MathUtils.lerp(this.speedZoom, this.targetSpeedZoom, Math.min(dt * 3.5, 1.0));
+    const targetZ = baseZ + this.speedZoom * 3.2;
 
     // 3. Smoothly follow target position with damping
     const followX = THREE.MathUtils.clamp(this.targetPosition.x + this.aimOffset.x, 5.0, 75.0);
-    const followY = THREE.MathUtils.clamp(this.targetPosition.y + this.aimOffset.y, 3.5, 45.0);
+    const followY = THREE.MathUtils.clamp(this.targetPosition.y + this.aimOffset.y + offsetY, 3.5, 45.0);
 
     this.currentPosition.x = THREE.MathUtils.lerp(this.currentPosition.x, followX, Math.min(dt * 10.0, 1.0));
     this.currentPosition.y = THREE.MathUtils.lerp(this.currentPosition.y, followY, Math.min(dt * 10.0, 1.0));
-    this.currentPosition.z = THREE.MathUtils.lerp(this.currentPosition.z, targetZ, Math.min(dt * 6.0, 1.0));
+    this.currentPosition.z = THREE.MathUtils.lerp(this.currentPosition.z, targetZ, Math.min(dt * 5.5, 1.0));
 
-    // 4. Calculate Trauma Shake (Crisp tactile thump, no dizzying seizure or screen tearing)
+    // 4. Calculate Trauma Shake
     if (this.trauma > 0) {
       const shakePower = this.trauma * this.trauma;
       const time = performance.now() * 0.04;
@@ -131,3 +229,4 @@ export class Camera3D {
     this.camera.lookAt(this.lookTarget);
   }
 }
+

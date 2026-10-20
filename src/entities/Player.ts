@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Actor3D } from './Actor3D';
 import { PlayerMesh3D } from './PlayerMesh3D';
-import { MovementRigType, PlayerStats, WeaponId } from '../config/types';
+import { MovementRigType, PlayerStats, WeaponId, TileType } from '../config/types';
 import { ARENA_CONFIG, WEAPON_REGISTRY } from '../config/constants';
 import { MM_CONFIG } from '../core/MiniMilitiaCore';
 import { TileMap3D } from '../world/TileMap3D';
@@ -62,7 +62,7 @@ export class Player {
       secondaryWeapon: WeaponId.PISTOL_XAG9,
       activeWeapon: WeaponId.RIFLE_XAG47,
       ammo: {
-        [WeaponId.CUTLASS]: 1,
+        [WeaponId.CUTLASS]: 999,
         [WeaponId.PISTOL_XAG9]: 15,
         [WeaponId.AKIMBO_UZIS]: 64,
         [WeaponId.SHOTGUN_AA12]: 20,
@@ -178,6 +178,7 @@ export class Player {
 
   public reloadWeapon(): void {
     const def = WEAPON_REGISTRY[this.stats.activeWeapon];
+    if (this.stats.activeWeapon === WeaponId.CUTLASS) return; // Infinite stamina melee weapon
     if (this.reloadTimer > 0 || this.stats.ammo[this.stats.activeWeapon] === def.magSize) return;
     this.reloadTimer = def.reloadTime;
   }
@@ -191,14 +192,18 @@ export class Player {
   ): void {
     if (this.stats.isDead) return;
 
+    // Berserker Melee passive +25% sprint & flight speed bonus while wielding Takobin Kano
+    const isMeleeEquipped = this.stats.activeWeapon === WeaponId.CUTLASS;
+    const speedMultiplier = isMeleeEquipped ? 1.25 : 1.0;
+
     const S = MM_CONFIG.WORLD_SCALE;
-    const maxRunSpeed = MM_CONFIG.MAX_RUN_SPEED * S;     // ~11.5 m/s
-    const groundAccel = MM_CONFIG.GROUND_ACCEL * S;     // ~96.5 m/s^2
-    const airAccel = MM_CONFIG.AIR_ACCEL * S;           // ~50.1 m/s^2
-    const jetpackThrust = MM_CONFIG.JETPACK_THRUST * S; // ~62.3 m/s^2
+    const maxRunSpeed = MM_CONFIG.MAX_RUN_SPEED * S * speedMultiplier;     // ~11.5 - 14.4 m/s
+    const groundAccel = MM_CONFIG.GROUND_ACCEL * S * speedMultiplier;     // ~96.5 m/s^2
+    const airAccel = MM_CONFIG.AIR_ACCEL * S * speedMultiplier;           // ~50.1 m/s^2
+    const jetpackThrust = MM_CONFIG.JETPACK_THRUST * S * speedMultiplier; // ~62.3 m/s^2
     const gravity = MM_CONFIG.GRAVITY * S;             // ~34.1 m/s^2
-    const maxAscend = Math.abs(MM_CONFIG.MAX_ASCEND_SPEED) * S; // ~16.3 m/s
-    const maxFall = MM_CONFIG.MAX_FALL_SPEED * S;       // ~23.0 m/s
+    const maxAscend = Math.abs(MM_CONFIG.MAX_ASCEND_SPEED) * S * (isMeleeEquipped ? 1.2 : 1.0);
+    const maxFall = MM_CONFIG.MAX_FALL_SPEED * S;
 
     // 1. HORIZONTAL MOMENTUM & SIGNATURE AIR DRIFT (paused during rig boost dashes)
     if (this.rigBoostTimer <= 0) {
@@ -256,15 +261,21 @@ export class Player {
   public performMeleeLunge(
     aimAngle: number,
     allPlayers?: Player[],
-    onHit?: (target: Player, damage: number) => void
+    onHit?: (target: Player, damage: number) => void,
+    tileMap?: TileMap3D
   ): void {
     if (this.meleeTimer > 0) return;
-    this.meleeTimer = 0.45;
+    this.meleeTimer = 0.28;
     const dirX = Math.cos(aimAngle);
-    this.actor.velocity.x = Math.sign(dirX || 1) * 22.0;
-    this.mesh.setWeapon(WeaponId.CUTLASS);
-    this.mesh.triggerRecoilKick(0.35);
+    const dirY = Math.sin(aimAngle);
 
+    // Forward kinetic lunge step (+4.5m burst boost along aiming vector)
+    this.actor.velocity.x += dirX * 16.0;
+    this.actor.velocity.y += Math.max(dirY * 12.0, 4.0);
+    this.mesh.setWeapon(WeaponId.CUTLASS);
+    this.mesh.triggerRecoilKick(0.45);
+
+    // Hitbox detection: 3.8m forward arc cone
     if (allPlayers) {
       for (const other of allPlayers) {
         if (other.stats.id === this.stats.id || other.stats.isDead) continue;
@@ -272,20 +283,34 @@ export class Player {
         const dy = (other.actor.position.y + 0.95) - (this.actor.position.y + 0.95);
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Within 2.2m reach and facing enemy
-        const facing = (dx * dirX) >= -0.2;
-        if (dist < 2.2 && facing) {
-          other.actor.velocity.x = Math.sign(dirX || 1) * 20.0;
-          other.actor.velocity.y = 10.0;
-          if (onHit) onHit(other, 85);
+        // Within 3.8m reach and in 140-degree forward cone
+        const dot = (dx * dirX + dy * dirY) / (dist || 1);
+        if (dist <= 3.8 && dot > -0.2) {
+          other.actor.velocity.x += dirX * 18.0;
+          other.actor.velocity.y += 8.0;
+          if (onHit) onHit(other, 90);
           break;
         }
       }
     }
 
+    // Cut through fragile wooden scaffolding or cracked tiles in front
+    if (tileMap) {
+      const slashX = Math.round(this.actor.position.x + dirX * 1.5);
+      const slashY = Math.round(this.actor.position.y + 0.95 + dirY * 1.5);
+      const t = tileMap.getTile(slashX, slashY);
+      if (t === TileType.WOOD_SCAFFOLD || t === TileType.GLASS_WINDOW) {
+        tileMap.destroyTile(slashX, slashY);
+      } else if (t === TileType.BRICK_CONCRETE) {
+        tileMap.damageTile(slashX, slashY, 80);
+      }
+    }
+
     setTimeout(() => {
-      this.mesh.setWeapon(this.stats.activeWeapon);
-    }, 380);
+      if (this.stats.activeWeapon !== WeaponId.CUTLASS) {
+        this.mesh.setWeapon(this.stats.activeWeapon);
+      }
+    }, 280);
   }
 
   public update(dt: number, tileMap: TileMap3D, rigSystem: RigSystem, aimAngle: number): void {
