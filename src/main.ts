@@ -214,6 +214,7 @@ engine.onUpdate((dt: number) => {
     // Instant Tactical Cutlass Melee
     if (input.state.melee) {
       const playerRef = localPlayer;
+      particles.spawnMeleeSlashArc(localPlayer.actor.position.x, localPlayer.actor.position.y, effectiveAimAngle);
       localPlayer.performMeleeLunge(effectiveAimAngle, modeManager.players, (target, dmg) => {
         const died = target.takeDamage(dmg, playerRef);
         audio.playGunshot('saw');

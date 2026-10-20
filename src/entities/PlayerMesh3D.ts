@@ -43,6 +43,7 @@ export class PlayerMesh3D {
   // Animation state
   private walkCycle: number = 0;
   private recoilOffset: number = 0;
+  public slashAnimTimer: number = 0;
   public isRagdoll: boolean = false;
   private ragdollVelocity: THREE.Vector3 = new THREE.Vector3();
   private ragdollAngVel: THREE.Vector3 = new THREE.Vector3();
@@ -995,6 +996,10 @@ export class PlayerMesh3D {
     this.recoilOffset = Math.min(this.recoilOffset + amount, 0.45);
   }
 
+  public triggerSlashAnim(): void {
+    this.slashAnimTimer = 0.22;
+  }
+
   public triggerThrusterBurst(active: boolean): void {
     const op = active ? 0.95 : 0.0;
     (this.thrusterFlameL.material as THREE.MeshBasicMaterial).opacity = op;
@@ -1088,12 +1093,20 @@ export class PlayerMesh3D {
       this.crosshairMesh.visible = false;
     }
 
-    // Procedural Recoil Kick
-    if (this.recoilOffset > 0) {
-      this.weaponMount.position.x = 0.28 - this.recoilOffset;
-      this.recoilOffset = Math.max(0, this.recoilOffset - dt * 2.8);
+    // Procedural Recoil Kick & Sword Slash Swing
+    if (this.slashAnimTimer > 0) {
+      const t = 1.0 - this.slashAnimTimer / 0.22;
+      this.weaponMount.rotation.z = Math.sin(t * Math.PI) * -1.35;
+      this.weaponMount.position.x = 0.28 + Math.sin(t * Math.PI) * 0.25;
+      this.slashAnimTimer = Math.max(0, this.slashAnimTimer - dt);
     } else {
-      this.weaponMount.position.x = 0.28;
+      this.weaponMount.rotation.z = 0;
+      if (this.recoilOffset > 0) {
+        this.weaponMount.position.x = 0.28 - this.recoilOffset;
+        this.recoilOffset = Math.max(0, this.recoilOffset - dt * 2.8);
+      } else {
+        this.weaponMount.position.x = 0.28;
+      }
     }
 
     // Crown spinning

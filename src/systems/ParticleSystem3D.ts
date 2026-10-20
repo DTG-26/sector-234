@@ -36,12 +36,20 @@ interface SmokePuff {
   maxLife: number;
 }
 
+interface MeleeSlash {
+  mesh: THREE.Mesh;
+  life: number;
+  maxLife: number;
+  startScale: number;
+}
+
 export class ParticleSystem3D {
   public group: THREE.Group;
   private casings: BrassCasing[] = [];
   private sparks: Spark[] = [];
   private shockwaves: Shockwave[] = [];
   private smokePuffs: SmokePuff[] = [];
+  private meleeSlashes: MeleeSlash[] = [];
   private casingGeom: THREE.CylinderGeometry;
   private casingMat: THREE.MeshStandardMaterial;
   private sparkGeom: THREE.SphereGeometry;
@@ -49,6 +57,8 @@ export class ParticleSystem3D {
   private smokeGeom: THREE.SphereGeometry;
   private smokeMat: THREE.MeshBasicMaterial;
   private shockwaveGeom: THREE.RingGeometry;
+  private slashGeom: THREE.RingGeometry;
+  private slashMat: THREE.MeshBasicMaterial;
 
   constructor(scene: THREE.Scene) {
     this.group = new THREE.Group();
@@ -79,6 +89,16 @@ export class ParticleSystem3D {
     });
 
     this.shockwaveGeom = new THREE.RingGeometry(0.2, 0.5, 24);
+
+    this.slashGeom = new THREE.RingGeometry(1.6, 3.4, 32, 1, -Math.PI * 0.44, Math.PI * 0.88);
+    this.slashMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.95,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
   }
 
   public spawnBrassCasing(x: number, y: number, facingRight: boolean): void {
@@ -161,6 +181,28 @@ export class ParticleSystem3D {
     });
   }
 
+  public spawnMeleeSlashArc(x: number, y: number, aimAngle: number, isGold: boolean = false): void {
+    const mat = this.slashMat.clone();
+    if (isGold) mat.color.setHex(0xf59e0b);
+    const mesh = new THREE.Mesh(this.slashGeom, mat);
+    mesh.position.set(x + Math.cos(aimAngle) * 0.7, y + 0.95 + Math.sin(aimAngle) * 0.7, 0.25);
+    mesh.rotation.z = aimAngle;
+    mesh.scale.set(0.65, 0.65, 1);
+    this.group.add(mesh);
+
+    this.meleeSlashes.push({
+      mesh,
+      life: 0,
+      maxLife: 0.22,
+      startScale: 0.65,
+    });
+
+    // Also spawn electric edge sparks along the slash arc
+    const normalX = Math.cos(aimAngle);
+    const normalY = Math.sin(aimAngle);
+    this.spawnSparks(x + normalX * 2.0, y + 0.95 + normalY * 2.0, normalX, normalY, 8);
+  }
+
   public update(dt: number, tileMap: TileMap3D): void {
     const gravity = -30.0;
 
@@ -241,6 +283,23 @@ export class ParticleSystem3D {
       if (sp.life >= sp.maxLife) {
         this.group.remove(sp.mesh);
         this.smokePuffs.splice(i, 1);
+      }
+    }
+
+    // 5. Crescent Melee Slashes
+    for (let i = this.meleeSlashes.length - 1; i >= 0; i--) {
+      const sl = this.meleeSlashes[i];
+      sl.life += dt;
+      const progress = sl.life / sl.maxLife;
+
+      const s = sl.startScale + progress * 0.75;
+      sl.mesh.scale.set(s, s, 1);
+      (sl.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, (1.0 - progress) * 0.95);
+
+      if (sl.life >= sl.maxLife) {
+        this.group.remove(sl.mesh);
+        (sl.mesh.material as THREE.Material).dispose();
+        this.meleeSlashes.splice(i, 1);
       }
     }
   }

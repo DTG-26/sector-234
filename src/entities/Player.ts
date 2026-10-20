@@ -274,6 +274,7 @@ export class Player {
     this.actor.velocity.y += Math.max(dirY * 12.0, 4.0);
     this.mesh.setWeapon(WeaponId.CUTLASS);
     this.mesh.triggerRecoilKick(0.45);
+    this.mesh.triggerSlashAnim();
 
     // Hitbox detection: 3.8m forward arc cone
     if (allPlayers) {

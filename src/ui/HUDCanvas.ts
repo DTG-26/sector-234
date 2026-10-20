@@ -4,7 +4,7 @@ import { InputManager } from '../core/InputManager';
 import { ModeManager } from '../modes/ModeManager';
 import { WEAPON_REGISTRY } from '../config/constants';
 import { VisionSystem3D } from '../world/VisionSystem3D';
-import { HeistAct } from '../config/types';
+import { HeistAct, MovementRigType, WeaponId } from '../config/types';
 
 export interface FloatingText {
   text: string;
@@ -68,10 +68,15 @@ export class HUDCanvas {
 
     ctx.clearRect(0, 0, w, h);
 
+    // 0. Tactical Sniper Scope Overlay (Rail-Sniper)
+    if (localPlayer.stats.activeWeapon === WeaponId.RAIL_SNIPER && !localPlayer.stats.isDead) {
+      this.renderSniperScope(ctx, w, h, localPlayer, input);
+    }
+
     // 1. Top Tactical Status Bar
     this.renderTopBar(ctx, w, h, localPlayer, modeManager);
 
-    // 2. Off-Screen Objective & Odogwu Radar Pointers
+    // 2. Off-Screen Objective & Odogwu Radar Compass Pointers
     this.renderEdgeIndicators(ctx, w, h, localPlayer, modeManager);
 
     // 3. Floating Combat Damage Numbers
@@ -81,7 +86,10 @@ export class HUDCanvas {
     this.updateHTMLControls(localPlayer, input);
     this.renderVisualSticks(ctx, w, h, input, localPlayer);
 
-    // 5. Critical Casualty Screen
+    // 5. Tactical Rig Radial Cooldown Meter
+    this.renderRigCooldown(ctx, w, h, localPlayer, input.state.isTouch);
+
+    // 6. Critical Casualty Screen
     if (localPlayer.stats.isDead) {
       this.renderDeathScreen(ctx, w, h, localPlayer);
     }
@@ -379,6 +387,106 @@ export class HUDCanvas {
     ctx.restore();
   }
 
+  private renderSniperScope(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    _player: Player,
+    _input: InputManager
+  ): void {
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    const scopeRadius = Math.min(w, h) * 0.44;
+
+    ctx.save();
+
+    // 1. Dark Vignette Outer Mask
+    const grad = ctx.createRadialGradient(cx, cy, scopeRadius * 0.35, cx, cy, scopeRadius * 1.35);
+    grad.addColorStop(0, 'rgba(2, 6, 23, 0.0)');
+    grad.addColorStop(0.65, 'rgba(2, 6, 23, 0.45)');
+    grad.addColorStop(1.0, 'rgba(2, 6, 23, 0.88)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // 2. Circular Scope Iris Ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, scopeRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    // Secondary Inner Target Circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, scopeRadius * 0.28, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // 3. Precision Crosshairs & Mil-Dot Tick Marks
+    ctx.beginPath();
+    ctx.moveTo(cx - scopeRadius, cy);
+    ctx.lineTo(cx - 24, cy);
+    ctx.moveTo(cx + 24, cy);
+    ctx.lineTo(cx + scopeRadius, cy);
+
+    ctx.moveTo(cx, cy - scopeRadius);
+    ctx.lineTo(cx, cy - 24);
+    ctx.moveTo(cx, cy + 24);
+    ctx.lineTo(cx, cy + scopeRadius);
+
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Mil-Dot elevation hash marks
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+    ctx.lineWidth = 1.0;
+    ctx.font = '700 9px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#38bdf8';
+    ctx.textAlign = 'center';
+
+    const tickDistances = [45, 90, 135];
+    tickDistances.forEach((d, idx) => {
+      ctx.beginPath();
+      ctx.moveTo(cx - d, cy - 4);
+      ctx.lineTo(cx - d, cy + 4);
+      ctx.moveTo(cx + d, cy - 4);
+      ctx.lineTo(cx + d, cy + 4);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, cy + d);
+      ctx.lineTo(cx + 6, cy + d);
+      ctx.stroke();
+      ctx.fillText(`${(idx + 1) * 10}m`, cx + 18, cy + d + 3);
+    });
+
+    // 4. Center Target Chevron
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, cy + 6);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx + 6, cy + 6);
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // 5. Digital Telemetry
+    ctx.font = '800 11px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#38bdf8';
+    ctx.textAlign = 'left';
+    ctx.fillText('⚡ RAIL ACCELERATOR // CHARGED', cx - scopeRadius + 18, cy - scopeRadius * 0.7);
+
+    ctx.textAlign = 'right';
+    ctx.fillText('4.5x MAG // 12.7mm HYPERVELOCITY', cx + scopeRadius - 18, cy - scopeRadius * 0.7);
+
+    ctx.textAlign = 'left';
+    ctx.font = '700 9px "JetBrains Mono", monospace';
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
+    ctx.fillText('FOV: 55° // TRAJECTORY: FLAT', cx - scopeRadius + 18, cy + scopeRadius * 0.7);
+
+    ctx.restore();
+  }
+
   private renderEdgeIndicators(
     ctx: CanvasRenderingContext2D,
     w: number,
@@ -386,73 +494,245 @@ export class HUDCanvas {
     player: Player,
     mode: ModeManager
   ): void {
-    // 1. Sarki Crown Pointer
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    // Helper to draw a sleek high-tech neon compass pointer
+    const drawPointer = (
+      targetWorldX: number,
+      targetWorldY: number,
+      label: string,
+      color: string,
+      icon: string
+    ) => {
+      const dx = targetWorldX - player.actor.position.x;
+      const dy = targetWorldY - player.actor.position.y;
+      const dist = Math.round(Math.hypot(dx, dy));
+
+      this.projVec.set(targetWorldX, targetWorldY, 0).project(this.camera);
+      const screenX = (this.projVec.x * 0.5 + 0.5) * w;
+      const screenY = (-(this.projVec.y * 0.5) + 0.5) * h;
+      const isBehind = this.projVec.z > 1.0;
+
+      const margin = 48;
+      const isOnScreen = !isBehind && screenX >= margin && screenX <= w - margin && screenY >= margin && screenY <= h - margin;
+
+      ctx.save();
+
+      if (isOnScreen) {
+        // ON-SCREEN: Draw high-tech tactical targeting reticle diamond above target
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+
+        const size = 14;
+        ctx.strokeRect(screenX - size, screenY - size, size * 2, size * 2);
+
+        // Distance Tag below
+        ctx.fillStyle = 'rgba(9, 13, 22, 0.85)';
+        ctx.fillRect(screenX - 44, screenY + size + 4, 88, 18);
+        ctx.strokeRect(screenX - 44, screenY + size + 4, 88, 18);
+
+        ctx.fillStyle = color;
+        ctx.font = '800 10.5px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${icon} ${dist}m`, screenX, screenY + size + 17);
+      } else {
+        // OFF-SCREEN: Clamp to edge and draw neon directional chevron pointer
+        const angle = isBehind ? Math.atan2(-dy, -dx) : Math.atan2(dy, dx);
+        const radiusX = (w * 0.5) - margin;
+        const radiusY = (h * 0.5) - margin;
+
+        const indX = cx + Math.cos(angle) * radiusX;
+        const indY = cy - Math.sin(angle) * radiusY;
+
+        // Draw Directional Pointing Triangle
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        const tipX = indX + Math.cos(angle) * 12;
+        const tipY = indY - Math.sin(angle) * 12;
+        const side1X = indX + Math.cos(angle + 2.5) * 8;
+        const side1Y = indY - Math.sin(angle + 2.5) * 8;
+        const side2X = indX + Math.cos(angle - 2.5) * 8;
+        const side2Y = indY - Math.sin(angle - 2.5) * 8;
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(side1X, side1Y);
+        ctx.lineTo(side2X, side2Y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Label Pill
+        const text = `${icon} ${label} [${dist}m]`;
+        ctx.font = '800 11px "JetBrains Mono", monospace';
+        const tw = ctx.measureText(text).width + 16;
+        const pillX = indX - tw * 0.5;
+        const pillY = indY + 14;
+
+        ctx.fillStyle = 'rgba(9, 13, 22, 0.88)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(pillX, pillY, tw, 20, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.textAlign = 'center';
+        ctx.fillText(text, indX, pillY + 14);
+      }
+
+      ctx.restore();
+    };
+
+    // 1. Central Vault Door in Vault Heist
+    if (mode.heistMode && !mode.heistMode.isVaultBreached) {
+      const vHp = Math.round(mode.heistMode.vaultHP);
+      drawPointer(40.0, 3.5, `VAULT (${vHp}HP)`, '#f59e0b', '🏢');
+    }
+
+    // 2. Sarki / Odogwu Crown Holder Pointer
     const sarki = mode.players.find((p) => p.mesh.crownMesh.visible && p.stats.id !== player.stats.id);
     if (sarki && !sarki.stats.isDead) {
-      const dx = sarki.actor.position.x - player.actor.position.x;
-      const dy = sarki.actor.position.y - player.actor.position.y;
-      const dist = Math.round(Math.sqrt(dx * dx + dy * dy));
-
-      const angle = Math.atan2(dy, dx);
-      const indX = w * 0.5 + Math.cos(angle) * (w * 0.44);
-      const indY = h * 0.5 - Math.sin(angle) * (h * 0.4);
-
-      ctx.fillStyle = '#f59e0b';
-      ctx.font = '800 13px "JetBrains Mono", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(`👑 SARKI [${dist}m]`, indX, indY);
+      drawPointer(sarki.actor.position.x, sarki.actor.position.y + 0.95, 'ODOGWU', '#eab308', '👑');
     }
 
-    // 2. Extraction Helicopter Pointer & Evac Progress
+    // 3. Extraction Evac Pointer
     if (mode.isExtractionActive()) {
       const extrPos = mode.getExtractionPos();
-      const dx = extrPos.x - player.actor.position.x;
-      const dy = extrPos.y - player.actor.position.y;
-      const dist = Math.round(Math.sqrt(dx * dx + dy * dy));
-
-      const angle = Math.atan2(dy, dx);
-      const indX = w * 0.5 + Math.cos(angle) * (w * 0.42);
-      const indY = h * 0.5 - Math.sin(angle) * (h * 0.38);
-
       const isContested = mode.heistMode?.isExtractionContested;
-      ctx.fillStyle = isContested ? '#ef4444' : '#10b981';
-      ctx.font = '800 14px "JetBrains Mono", monospace';
-      ctx.textAlign = 'center';
-
-      if (mode.heistMode && dist < 4.0) {
-        const prog = mode.heistMode.extractionProgress.get(player.stats.id) || 0;
-        ctx.fillText(`🚁 ${isContested ? 'CONTESTED!' : `HOLD: ${prog.toFixed(1)}s / 5.0s`}`, indX, indY);
-      } else {
-        ctx.fillText(`🚁 EXTRACTION [${dist}m]`, indX, indY);
-      }
+      drawPointer(extrPos.x, extrPos.y, isContested ? 'CONTESTED EVAC' : 'EXTRACTION', isContested ? '#ef4444' : '#10b981', '🚁');
     }
 
-
-    // 3. Nearest Cash Pickup Radar Pointer (Always shows where to get money!)
+    // 4. Nearest Cash Stash
     let nearestCash: any = null;
-    let minCashDist = 40.0;
+    let minCashDist = 45.0;
     for (let i = 0; i < mode.pickups.length; i++) {
       const pk = mode.pickups[i];
       if (pk.isCollected || pk.type !== 'cash') continue;
       const d = player.actor.position.distanceTo(pk.mesh.position);
-      if (d < minCashDist && d > 7.0) {
+      if (d < minCashDist && d > 8.0) {
         minCashDist = d;
         nearestCash = pk;
       }
     }
-
     if (nearestCash) {
-      const dx = nearestCash.mesh.position.x - player.actor.position.x;
-      const dy = nearestCash.mesh.position.y - player.actor.position.y;
-      const dist = Math.round(minCashDist);
-      const angle = Math.atan2(dy, dx);
-      const indX = w * 0.5 + Math.cos(angle) * (w * 0.4);
-      const indY = h * 0.5 - Math.sin(angle) * (h * 0.36);
+      drawPointer(nearestCash.mesh.position.x, nearestCash.mesh.position.y, 'CASH', '#34d399', '💰');
+    }
+  }
 
-      ctx.fillStyle = '#34d399';
-      ctx.font = '800 12px "JetBrains Mono", monospace';
+  private renderRigCooldown(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    player: Player,
+    isTouch: boolean
+  ): void {
+    const rigCooldowns: Record<MovementRigType, number> = {
+      [MovementRigType.BREACH_BOOSTER]: 2.5,
+      [MovementRigType.OVERDRIVE_SLIDE]: 1.5,
+      [MovementRigType.PHASE_DASH]: 3.0,
+      [MovementRigType.GLITCH_ANCHOR]: 4.0,
+    };
+    const maxCd = rigCooldowns[player.stats.rigType] || 2.5;
+    const currentTimer = Math.max(0, player.stats.rigCooldownTimer);
+    const progress = Math.min(1.0, Math.max(0, 1.0 - currentTimer / maxCd));
+    const isReady = currentTimer <= 0;
+
+    const rigColors: Record<MovementRigType, string> = {
+      [MovementRigType.BREACH_BOOSTER]: '#06b6d4',
+      [MovementRigType.OVERDRIVE_SLIDE]: '#f59e0b',
+      [MovementRigType.PHASE_DASH]: '#a855f7',
+      [MovementRigType.GLITCH_ANCHOR]: '#ec4899',
+    };
+    const activeColor = rigColors[player.stats.rigType] || '#06b6d4';
+
+    // 1. Mobile HUD Radial Ring around #btn-touch-rig
+    const btnRig = document.getElementById('btn-touch-rig');
+    if (btnRig && btnRig.offsetParent !== null) {
+      const rect = btnRig.getBoundingClientRect();
+      const bx = rect.left + rect.width * 0.5;
+      const by = rect.top + rect.height * 0.5;
+      const radius = rect.width * 0.5 + 4;
+
+      ctx.save();
+
+      // Background Track
+      ctx.beginPath();
+      ctx.arc(bx, by, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+
+      if (!isReady) {
+        // Active Radial Sweep Fill
+        const startA = -Math.PI * 0.5;
+        const endA = startA + progress * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(bx, by, radius, startA, endA);
+        ctx.strokeStyle = activeColor;
+        ctx.lineWidth = 4.0;
+        ctx.shadowColor = activeColor;
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+      } else {
+        // Ready Glow Ring
+        const pulse = 0.6 + Math.sin(performance.now() * 0.008) * 0.35;
+        ctx.beginPath();
+        ctx.arc(bx, by, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = activeColor;
+        ctx.lineWidth = 3.0;
+        ctx.shadowColor = activeColor;
+        ctx.shadowBlur = 12 * pulse;
+        ctx.globalAlpha = pulse;
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    // 2. Desktop & Universal Bottom Status Rig Meter (pinned at bottom-center)
+    if (!isTouch || w >= 900) {
+      const mw = 185;
+      const mh = 24;
+      const mx = w * 0.5 - mw * 0.5;
+      const my = h - 38;
+
+      ctx.save();
+      // Plate background
+      ctx.fillStyle = 'rgba(9, 13, 22, 0.85)';
+      ctx.strokeStyle = isReady ? activeColor : 'rgba(148, 163, 184, 0.3)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.roundRect(mx, my, mw, mh, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // Progress bar fill
+      if (!isReady) {
+        ctx.fillStyle = activeColor;
+        ctx.globalAlpha = 0.5;
+        ctx.fillRect(mx + 2, my + 2, (mw - 4) * progress, mh - 4);
+        ctx.globalAlpha = 1.0;
+      }
+
+      // Text label
+      ctx.fillStyle = isReady ? '#f8fafc' : '#94a3b8';
+      ctx.font = '800 10.5px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`💰 CASH [${dist}m]`, indX, indY);
+      const rigNames: Record<MovementRigType, string> = {
+        [MovementRigType.BREACH_BOOSTER]: 'BREACH BOOSTER',
+        [MovementRigType.OVERDRIVE_SLIDE]: 'OVERDRIVE SLIDE',
+        [MovementRigType.PHASE_DASH]: 'PHASE DASH',
+        [MovementRigType.GLITCH_ANCHOR]: 'GLITCH ANCHOR',
+      };
+      const rName = rigNames[player.stats.rigType] || 'TACTICAL RIG';
+      const label = isReady ? `⚡ [SHIFT] ${rName} [READY]` : `⚡ ${rName} [${currentTimer.toFixed(1)}s]`;
+      ctx.fillText(label, mx + mw * 0.5, my + 16);
+
+      ctx.restore();
     }
   }
 

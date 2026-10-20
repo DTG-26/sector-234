@@ -39,6 +39,7 @@ export class WeaponSystem {
     if (weaponDef.id === WeaponId.CUTLASS) {
       player.fireCooldown = weaponDef.fireInterval;
       this.audio.playMeleeSwish();
+      this.particles.spawnMeleeSlashArc(player.actor.position.x, player.actor.position.y, aimAngle);
 
       player.performMeleeLunge(aimAngle, allPlayers, (target, dmg) => {
         const died = target.takeDamage(dmg, player);
