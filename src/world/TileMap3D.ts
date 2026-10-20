@@ -175,7 +175,8 @@ export class TileMap3D {
       color: 0xffffff,
       map: new THREE.CanvasTexture(ironCanvas),
       roughness: 0.45,
-      metalness: 0.75,
+      metalness: 0.1,
+      emissive: 0x1c1917,
     });
   }
 
@@ -228,7 +229,9 @@ export class TileMap3D {
       color: 0xffffff,
       map: new THREE.CanvasTexture(danfoCanvas),
       roughness: 0.35,
-      metalness: 0.55,
+      metalness: 0.1,
+      emissive: 0x422006,
+      emissiveIntensity: 0.4,
     });
 
     // 3. Market Umbrellas & Wooden Catwalks
@@ -268,9 +271,9 @@ export class TileMap3D {
       color: 0xffffff,
       map: new THREE.CanvasTexture(genCanvas),
       roughness: 0.4,
-      metalness: 0.6,
+      metalness: 0.1,
       emissive: 0x15803d,
-      emissiveIntensity: 0.2,
+      emissiveIntensity: 0.4,
     });
   }
 
@@ -289,9 +292,9 @@ export class TileMap3D {
     this.transformerMaterial = new THREE.MeshStandardMaterial({
       color: 0xca8a04,
       roughness: 0.45,
-      metalness: 0.65,
+      metalness: 0.1,
       emissive: 0xca8a04,
-      emissiveIntensity: 0.2,
+      emissiveIntensity: 0.3,
     });
 
     this.sharedBoxGeometry = new THREE.BoxGeometry(

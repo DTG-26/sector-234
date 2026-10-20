@@ -57,10 +57,10 @@ export class ParticleSystem3D {
     this.casingGeom = new THREE.CylinderGeometry(0.025, 0.025, 0.1, 8);
     this.casingMat = new THREE.MeshStandardMaterial({
       color: 0xf59e0b,
-      roughness: 0.15,
-      metalness: 0.95,
+      roughness: 0.25,
+      metalness: 0.1,
       emissive: 0xd97706,
-      emissiveIntensity: 0.2,
+      emissiveIntensity: 0.5,
     });
 
     this.sparkGeom = new THREE.SphereGeometry(0.06, 6, 6);

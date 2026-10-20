@@ -25,7 +25,7 @@ export class Pickup3D {
         emissive: 0x059669,
         emissiveIntensity: 2.5,
         roughness: 0.3,
-        metalness: 0.2,
+        metalness: 0.05,
       });
       const cashMesh = new THREE.Mesh(stackGeom, cashMat);
       this.mesh.add(cashMesh);
@@ -56,7 +56,7 @@ export class Pickup3D {
         emissive: 0xb45309,
         emissiveIntensity: 2.2,
         roughness: 0.4,
-        metalness: 0.6,
+        metalness: 0.1,
       });
       const crateMesh = new THREE.Mesh(crateGeom, crateMat);
       this.mesh.add(crateMesh);
@@ -81,7 +81,7 @@ export class Pickup3D {
         emissive: 0x991b1b,
         emissiveIntensity: 1.8,
         roughness: 0.3,
-        metalness: 0.3,
+        metalness: 0.05,
       });
       const packMesh = new THREE.Mesh(packGeom, packMat);
       this.mesh.add(packMesh);

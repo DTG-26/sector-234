@@ -67,15 +67,22 @@ export class HeistModeManager {
     this.vaultMesh.position.copy(this.vaultPos);
 
     // Vault Frame (Steel / Mud-reinforced)
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.8 });
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0x475569,
+      emissive: 0x1e293b,
+      roughness: 0.5,
+      metalness: 0.1,
+    });
     const frame = new THREE.Mesh(new THREE.BoxGeometry(5.2, 5.0, 1.2), frameMat);
     this.vaultMesh.add(frame);
 
     // Blast Doors (Left & Right)
     const doorMat = new THREE.MeshStandardMaterial({
       color: 0xd97706, // Bronze/gold hazard
+      emissive: 0x78350f,
+      emissiveIntensity: 0.8,
       roughness: 0.35,
-      metalness: 0.85,
+      metalness: 0.1,
     });
     this.vaultDoorL = new THREE.Mesh(new THREE.BoxGeometry(2.1, 4.4, 0.4), doorMat);
     this.vaultDoorL.position.set(-1.15, 0, 0.45);
@@ -105,8 +112,8 @@ export class HeistModeManager {
     const caseMat = new THREE.MeshStandardMaterial({
       color: 0xf59e0b,
       emissive: 0xd97706,
-      emissiveIntensity: 0.6,
-      metalness: 0.95,
+      emissiveIntensity: 1.5,
+      metalness: 0.1,
       roughness: 0.1,
     });
     const caseBody = new THREE.Mesh(caseGeom, caseMat);
@@ -132,12 +139,23 @@ export class HeistModeManager {
     this.chopperGroup.position.set(this.extractionPadPos.x, this.extractionPadPos.y + 4.5, 0);
 
     // Fuselage
-    const heliMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.7 });
+    const heliMat = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      emissive: 0x0f172a,
+      roughness: 0.4,
+      metalness: 0.1,
+    });
     const heliBody = new THREE.Mesh(new THREE.BoxGeometry(5.5, 1.8, 1.6), heliMat);
     this.chopperGroup.add(heliBody);
 
     // Cockpit Canopy (Tinted Glass)
-    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x38bdf8, roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.7 });
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0x38bdf8,
+      roughness: 0.1,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.7,
+    });
     const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 1.4), glassMat);
     canopy.position.set(2.2, 0.1, 0);
     this.chopperGroup.add(canopy);

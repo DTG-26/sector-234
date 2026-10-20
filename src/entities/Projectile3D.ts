@@ -42,7 +42,7 @@ export class Projectile3D {
       color: 0x38bdf8,
       emissive: 0x0284c7,
       emissiveIntensity: 4.0,
-      metalness: 0.95,
+      metalness: 0.1,
     });
 
     // Rail sniper

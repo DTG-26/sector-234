@@ -85,13 +85,15 @@ export class Engine3D {
     rimLight.name = 'PlatformRimLight';
     this.scene.add(rimLight);
 
-    // Subtle dark indigo / slate sky bounce
-    const hemiLight = new THREE.HemisphereLight(0x1e3a8a, 0x090d16, 0.35);
+    // Strong Hemisphere Light for rich environmental & character ground fill
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x445544, 1.8);
+    hemiLight.name = 'MainHemisphereLight';
     this.scene.add(hemiLight);
 
-    // Soft front fill light so player silhouettes and floating badges pop crisply
-    const frontLight = new THREE.DirectionalLight(0x94a3b8, 0.22);
-    frontLight.position.set(40, 25, 45);
+    // Strong Front-Facing Directional Light shining directly down camera Z-axis onto operators and weapons
+    const frontLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    frontLight.position.set(15, 25, 35);
+    frontLight.name = 'FrontCameraLight';
     this.scene.add(frontLight);
   }
 
@@ -99,16 +101,20 @@ export class Engine3D {
     const ambient = this.scene.getObjectByName('AmbientLight') as THREE.AmbientLight | null;
     const dir = this.scene.getObjectByName('MainDirectionalLight') as THREE.DirectionalLight | null;
     const rim = this.scene.getObjectByName('PlatformRimLight') as THREE.DirectionalLight | null;
-    if (ambient && dir) {
-      if (enabled) {
-        ambient.intensity = 0.12;
-        dir.intensity = 0.15;
-        if (rim) rim.intensity = 0.1;
-      } else {
-        ambient.intensity = 0.40;
-        dir.intensity = 1.15;
-        if (rim) rim.intensity = 0.55;
-      }
+    const hemi = this.scene.getObjectByName('MainHemisphereLight') as THREE.HemisphereLight | null;
+    const front = this.scene.getObjectByName('FrontCameraLight') as THREE.DirectionalLight | null;
+    if (enabled) {
+      if (ambient) ambient.intensity = 0.15;
+      if (dir) dir.intensity = 0.2;
+      if (rim) rim.intensity = 0.1;
+      if (hemi) hemi.intensity = 0.4;
+      if (front) front.intensity = 0.4;
+    } else {
+      if (ambient) ambient.intensity = 0.40;
+      if (dir) dir.intensity = 1.15;
+      if (rim) rim.intensity = 0.55;
+      if (hemi) hemi.intensity = 1.8;
+      if (front) front.intensity = 2.2;
     }
   }
 
