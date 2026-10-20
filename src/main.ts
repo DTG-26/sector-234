@@ -86,7 +86,9 @@ net.onFireWeapon = (fire) => {
       fire.aimAngle,
       modeManager.players,
       (victim, killer) => modeManager.handlePlayerElimination(victim, killer),
-      tileMap
+      tileMap,
+      fire.originX,
+      fire.originY
     );
   }
 };
@@ -412,10 +414,10 @@ engine.onUpdate((dt: number) => {
   // Update Local Player
   localPlayer.update(dt, tileMap, rigSystem, effectiveAimAngle);
 
-  // Send 30Hz Client Tick in Online Matches
+  // Send 35Hz Client Tick in Online Matches
   if (net.isConnected && net.currentRoomId) {
     const now = performance.now();
-    if (now - lastNetTick >= 33) {
+    if (now - lastNetTick >= 28) {
       lastNetTick = now;
       net.sendTick({
         id: localPlayer.stats.id,

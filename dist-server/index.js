@@ -153,7 +153,7 @@ var Room = class {
     this.stopSnapshotLoop();
     this.snapshotInterval = setInterval(() => {
       this.broadcastSnapshot();
-    }, 1e3 / 30);
+    }, 1e3 / 35);
   }
   stopSnapshotLoop() {
     if (this.snapshotInterval) {
@@ -310,6 +310,13 @@ function generatePlayerId() {
   return "p_" + Math.random().toString(36).substring(2, 9);
 }
 wss.on("connection", (ws) => {
+  try {
+    const rawSocket = ws._socket;
+    if (rawSocket && typeof rawSocket.setNoDelay === "function") {
+      rawSocket.setNoDelay(true);
+    }
+  } catch (e) {
+  }
   const playerId = generatePlayerId();
   clientSockets.set(playerId, ws);
   console.log(`[NET] New client connected: ${playerId}`);

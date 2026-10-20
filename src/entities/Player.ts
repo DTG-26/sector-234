@@ -29,6 +29,7 @@ export class Player {
   public meleeTimer: number = 0;
   public healthRegenDelay: number = 0;
   public c4RegenTimer: number = 0;
+  public lastDamageTakenTime: number = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -115,6 +116,7 @@ export class Player {
 
     this.stats.hp = Math.max(0, this.stats.hp - amount);
     this.healthRegenDelay = 3.5; // Reset 3.5s cooldown before health regeneration begins
+    this.lastDamageTakenTime = performance.now();
     this.syncStatusBillboard();
 
     if (this.stats.hp <= 0) {
@@ -226,7 +228,7 @@ export class Player {
     if (isThrusting) {
       this.isJetFlying = true;
       this.actor.isJetFlying = true;
-      const thrustStrength = Math.max(0.9, flyIntensity);
+      const thrustStrength = Math.max(0.65, flyIntensity);
       this.actor.velocity.y += jetpackThrust * thrustStrength * dt;
       this.actor.isGrounded = false;
       this.mesh.triggerThrusterBurst(true);

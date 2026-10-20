@@ -208,10 +208,10 @@ export class Room {
 
   private startSnapshotLoop(): void {
     this.stopSnapshotLoop();
-    // 30 Hz server snapshot broadcast
+    // 35 Hz server snapshot broadcast (every 28.5ms) for buttery-smooth multiplayer tracking
     this.snapshotInterval = setInterval(() => {
       this.broadcastSnapshot();
-    }, 1000 / 30);
+    }, 1000 / 35);
   }
 
   private stopSnapshotLoop(): void {

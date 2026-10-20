@@ -124,6 +124,16 @@ function generatePlayerId(): string {
 }
 
 wss.on('connection', (ws: WebSocket) => {
+  // Disable Nagle's algorithm (TCP_NODELAY) for instant packet delivery without 40ms buffering
+  try {
+    const rawSocket = (ws as any)._socket;
+    if (rawSocket && typeof rawSocket.setNoDelay === 'function') {
+      rawSocket.setNoDelay(true);
+    }
+  } catch (e) {
+    // ignore
+  }
+
   const playerId = generatePlayerId();
   clientSockets.set(playerId, ws);
 

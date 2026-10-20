@@ -29,9 +29,15 @@ export class WeaponSystem {
     aimAngle: number,
     allPlayers?: Player[],
     onElimination?: (victim: Player, killer: Player) => void,
-    tileMap?: TileMap3D
+    tileMap?: TileMap3D,
+    originX?: number,
+    originY?: number
   ): boolean {
-    if (player.stats.isDead || player.fireCooldown > 0 || player.reloadTimer > 0) return false;
+    if (player.stats.isDead) return false;
+    // Local player enforces cooldown; network events for remote players execute directly
+    if (player.stats.isLocalPlayer) {
+      if (player.fireCooldown > 0 || player.reloadTimer > 0) return false;
+    }
 
     const weaponDef = WEAPON_REGISTRY[player.stats.activeWeapon];
 
@@ -73,12 +79,12 @@ export class WeaponSystem {
 
     const currentAmmo = player.stats.ammo[weaponDef.id] ?? 0;
 
-    if (currentAmmo <= 0) {
+    if (player.stats.isLocalPlayer && currentAmmo <= 0) {
       player.reloadWeapon();
       return false;
     }
 
-    if (weaponDef.id !== WeaponId.PISTOL_XAG9) {
+    if (weaponDef.id !== WeaponId.PISTOL_XAG9 && player.stats.isLocalPlayer) {
       player.stats.ammo[weaponDef.id]--;
     }
     player.fireCooldown = weaponDef.fireInterval;
@@ -92,8 +98,8 @@ export class WeaponSystem {
 
     // Spawn Projectiles
     const pelletCount = weaponDef.pellets || 1;
-    const shooterOriginX = player.actor.position.x;
-    const shooterOriginY = player.actor.position.y + 0.95;
+    const shooterOriginX = originX !== undefined ? originX : player.actor.position.x;
+    const shooterOriginY = originY !== undefined ? originY : (player.actor.position.y + 0.95);
     const muzzleX = shooterOriginX + Math.cos(aimAngle) * 0.25;
     const muzzleY = shooterOriginY + Math.sin(aimAngle) * 0.25;
 

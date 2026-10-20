@@ -3,41 +3,41 @@
 // ============================================================================
 
 export const MM_CONFIG = {
-  // --- GRAVITY & VERTICAL THRUST (THE MINI MILITIA FLOAT FEEL) ---
-  GRAVITY: 980,              // Downward pull (px/s^2)
-  JETPACK_THRUST: 2400,      // Upward thrust acceleration (smooth, responsive lift)
-  MAX_ASCEND_SPEED: -580,    // Terminal upward velocity (negative Y is up in 2D pixels)
-  MAX_FALL_SPEED: 760,       // Terminal falling velocity
+  // --- GRAVITY & VERTICAL THRUST (THE SIGNATURE MINI MILITIA FLOAT FEEL) ---
+  GRAVITY: 940,              // Natural downward pull (px/s^2)
+  JETPACK_THRUST: 1950,      // Smooth upward thrust (comfortably overcomes gravity without rocket hyperspeed)
+  MAX_ASCEND_SPEED: -480,    // Controlled terminal upward velocity
+  MAX_FALL_SPEED: 660,       // Natural falling velocity
   FUEL_MAX: 100,
   FUEL_BURN_RATE: 0,         // UNLIMITED NITRO: No fuel drain, continuous flight!
   FUEL_REGEN_RATE: 100,      // Instantly full
   FUEL_REGEN_DELAY: 0,
 
   // --- HORIZONTAL MOMENTUM & AIR DRIFT ---
-  GROUND_ACCEL: 3800,        // Snappy instant start on the ground
-  AIR_ACCEL: 2200,           // Fast responsive horizontal steering while flying
-  MAX_RUN_SPEED: 420,        // Max horizontal speed
-  GROUND_FRICTION: 0.82,     // Stops quickly on floors when stick is released
-  AIR_DRAG: 0.965,           // CRITICAL: High retention (0.965) gives the signature Mini Militia mid-air glide/drift!
+  GROUND_ACCEL: 2800,        // Natural snappy start without hyper-speed
+  AIR_ACCEL: 1500,           // Controlled horizontal steering while flying
+  MAX_RUN_SPEED: 320,        // Classic balanced arcade speed (comfortable and readable)
+  GROUND_FRICTION: 0.82,     // Stops cleanly on floors when stick is released
+  AIR_DRAG: 0.965,           // CRITICAL: High retention gives the signature Mini Militia mid-air glide/drift!
 
   // --- RIGHT STICK 2-ZONE AIM & AUTO-FIRE THRESHOLDS ---
-  STICK_MAX_RADIUS: 65,      // Max visual drag radius in CSS pixels
-  DEADZONE: 0.08,            // 0% to 8%: Instant touch activation without dead feeling
-  FIRE_THRESHOLD: 0.25,      // Responsive threshold: beyond 25% radius auto-fires continuously!
+  STICK_MAX_RADIUS: 68,      // Standard visual drag radius in CSS pixels
+  DEADZONE: 0.10,            // 10%: Comfortable thumb deadzone
+  FIRE_THRESHOLD: 0.30,      // 30%: Smooth auto-fire trigger
   TAP_MELEE_MAX_MS: 170,     // Quick tap threshold
 
   // --- LEFT STICK VERTICAL ZONES ---
-  THRUST_Y_THRESHOLD: -0.20, // Pushing Left Stick even slightly upward ignites continuous Jetpack/Thruster
+  THRUST_Y_THRESHOLD: -0.25, // Pushing Left Stick comfortably above center ignites Jetpack
   SLAM_Y_THRESHOLD: 999,     // Violent instant drop disabled - smooth natural descent instead
 
   // --- CAMERA LOOK-AHEAD (PEEK WHERE YOU AIM) ---
-  CAM_LOOKAHEAD_DIST: 240,   // Shifts camera 240px toward your aim angle
-  CAM_SMOOTH_LERP: 0.095,    // Smooth elastic camera follow
+  CAM_LOOKAHEAD_DIST: 200,   // Shifts camera comfortably toward aim angle
+  CAM_SMOOTH_LERP: 0.085,    // Smooth elastic camera follow
 
   // --- 3D ARENA WORLD CONVERSION SCALE ---
   // In our Three.js world, 1 unit = 1 meter / tile.
-  // 420 px/s corresponds to 15.2 m/s, yielding scale S = 15.2 / 420 ≈ 0.0362
-  WORLD_SCALE: 15.2 / 420,
+  // 320 px/s corresponds to 9.8 m/s, yielding scale S = 9.8 / 320 ≈ 0.0306
+  WORLD_SCALE: 9.8 / 320,
 };
 
 export interface StickState {

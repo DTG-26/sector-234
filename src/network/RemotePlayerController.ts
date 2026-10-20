@@ -16,6 +16,7 @@ export class RemotePlayerController {
   private targetIsJetFlying: boolean;
   private targetIsGrounded: boolean;
   private targetIsSliding: boolean;
+  private lastDamageTime: number = 0;
 
   constructor(player: Player, particles: ParticleSystem3D) {
     this.player = player;
@@ -33,6 +34,8 @@ export class RemotePlayerController {
   }
 
   public applySnapshot(state: NetworkPlayerState): void {
+    const now = performance.now();
+
     this.targetX = state.x;
     this.targetY = state.y;
     this.targetVx = state.vx;
@@ -43,10 +46,18 @@ export class RemotePlayerController {
     this.targetIsGrounded = state.isGrounded;
     this.targetIsSliding = state.isSliding;
 
-    this.player.stats.hp = state.hp;
+    // Health Reconciliation:
+    // If local player recently dealt damage to this remote player (< 600ms),
+    // don't let stale snapshots from the server bounce their HP back up!
+    const recentLocalDamage = (now - this.lastDamageTime) < 600;
+    if (!recentLocalDamage || state.hp <= this.player.stats.hp) {
+      this.player.stats.hp = state.hp;
+    }
+
     this.player.stats.armor = state.armor;
     this.player.jetFuel = state.fuel;
     this.player.stats.isDead = state.isDead;
+    this.player.syncStatusBillboard();
 
     if (this.player.stats.activeWeapon !== state.activeWeapon) {
       this.player.stats.activeWeapon = state.activeWeapon;
@@ -54,23 +65,50 @@ export class RemotePlayerController {
     }
   }
 
+  public notifyLocalDamageDealt(): void {
+    this.lastDamageTime = performance.now();
+  }
+
   public update(dt: number): void {
     if (this.player.stats.isDead) return;
 
-    // 1. Smooth Positional Interpolation (Lerp with speed-adaptive factor)
-    const lerpFactor = Math.min(1.0, dt * 18.0);
-    this.player.actor.position.x += (this.targetX - this.player.actor.position.x) * lerpFactor;
-    this.player.actor.position.y += (this.targetY - this.player.actor.position.y) * lerpFactor;
+    // 1. DEAD RECKONING: Extrapolate target position using current velocity
+    // Between network snapshots (every 28-35ms), remote players NEVER stop or stutter!
+    this.targetX += this.targetVx * dt;
+    this.targetY += this.targetVy * dt;
+
+    if (!this.targetIsGrounded && !this.targetIsJetFlying) {
+      // Natural aerial gravity so airborne opponents curve and fall smoothly
+      this.targetVy -= 28.0 * dt;
+    }
+
+    // 2. Adaptive Smooth Positional Convergence
+    const dx = this.targetX - this.player.actor.position.x;
+    const dy = this.targetY - this.player.actor.position.y;
+    const distSq = dx * dx + dy * dy;
+
+    if (distSq > 36.0) {
+      // Hard snap on large teleport / respawn (> 6 meters)
+      this.player.actor.position.x = this.targetX;
+      this.player.actor.position.y = this.targetY;
+    } else {
+      // Smooth adaptive lerp: higher convergence rate if falling behind, silky smooth glide when close
+      const lerpSpeed = distSq > 1.5 ? 26.0 : 16.0;
+      const factor = Math.min(1.0, dt * lerpSpeed);
+      this.player.actor.position.x += dx * factor;
+      this.player.actor.position.y += dy * factor;
+    }
+
     this.player.actor.velocity.x = this.targetVx;
     this.player.actor.velocity.y = this.targetVy;
 
-    // 2. Smooth Aim Angle Interpolation
+    // 3. Smooth Aim Angle Interpolation
     let diff = this.targetAimAngle - this.currentAimAngle;
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
-    this.currentAimAngle += diff * Math.min(1.0, dt * 22.0);
+    this.currentAimAngle += diff * Math.min(1.0, dt * 25.0);
 
-    // 3. Update 3D Articulated Operator Mesh
+    // 4. Update 3D Articulated Operator Mesh
     this.player.mesh.update(
       dt,
       this.player.actor.position.x,
@@ -82,8 +120,8 @@ export class RemotePlayerController {
       this.targetIsSliding
     );
 
-    // 4. Jetpack Visuals for Remote Players
-    if (this.targetIsJetFlying && Math.random() < 0.5) {
+    // 5. Jetpack Visuals for Remote Players
+    if (this.targetIsJetFlying && Math.random() < 0.6) {
       this.particles.spawnJetpackSmoke(
         this.player.actor.position.x + (this.targetFacingRight ? -0.2 : 0.2),
         this.player.actor.position.y + 0.35,
