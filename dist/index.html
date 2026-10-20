@@ -2,6 +2,11 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        window.location.replace('https://' + window.location.host + window.location.pathname + window.location.search);
+      }
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -250,7 +255,7 @@
         50% { transform: rotate(-90deg); }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-CAq-qjxI.js"></script>
+    <script type="module" crossorigin src="/assets/index-DgdCYk_d.js"></script>
   </head>
   <body>
     <!-- Orientation Reminder Overlay for Portrait Mobile Users -->

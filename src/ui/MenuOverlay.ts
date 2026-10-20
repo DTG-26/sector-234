@@ -1041,7 +1041,12 @@ export class MenuOverlay {
               <button id="lobby-close-btn" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer;">✕</button>
             </div>
 
-            ${errorMsg ? `<div style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; padding: 8px 12px; font-size: 11px; border-radius: 4px; margin-bottom: 14px;">⚠️ ${errorMsg}</div>` : ''}
+            ${errorMsg ? `
+              <div style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; padding: 10px 14px; font-size: 11px; border-radius: 6px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+                <span>⚠️ ${errorMsg}</span>
+                <button id="btn-lobby-retry" style="background: #ef4444; border: none; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 800; cursor: pointer; font-family: inherit;">RETRY</button>
+              </div>
+            ` : ''}
 
             <div style="margin-bottom: 20px;">
               <button id="lobby-create-btn" style="width: 100%; background: linear-gradient(135deg, #0284c7, #0369a1); border: 1px solid #38bdf8; color: #ffffff; padding: 14px; font-weight: 900; font-size: 14px; letter-spacing: 2px; cursor: pointer; border-radius: 4px; font-family: inherit; transition: transform 0.1s;">
@@ -1060,14 +1065,24 @@ export class MenuOverlay {
               <button id="lobby-join-btn" style="background: #1e293b; border: 1px solid #06b6d4; color: #38bdf8; font-weight: 800; font-size: 13px; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-family: inherit;">JOIN</button>
             </div>
 
-            <div style="font-size: 10px; color: #64748b; text-align: center;">
-              Requires local server running (<code style="color: #38bdf8;">npm run server</code>).
+            <div style="font-size: 11px; color: #64748b; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #22c55e;"></span>
+              <span>Live Railway Cloud Multiplayer (wss://sector-234-production.up.railway.app)</span>
             </div>
           </div>
         `;
 
         document.getElementById('lobby-close-btn')?.addEventListener('click', () => {
           overlay.remove();
+        });
+
+        document.getElementById('btn-lobby-retry')?.addEventListener('click', () => {
+          renderLobbyContent();
+          net.connect().then((connected) => {
+            if (!connected) {
+              renderLobbyContent(undefined, `Unable to reach live arena server (${net.serverUrl}).`);
+            }
+          });
         });
 
         document.getElementById('lobby-create-btn')?.addEventListener('click', () => {
@@ -1098,7 +1113,7 @@ export class MenuOverlay {
 
     net.connect().then((connected) => {
       if (!connected) {
-        renderLobbyContent(undefined, 'Cannot connect to game server (ws://localhost:8080). Make sure "npm run server" is running.');
+        renderLobbyContent(undefined, `Unable to reach live arena server (${net.serverUrl}). Tap RETRY to reconnect.`);
       }
     });
 

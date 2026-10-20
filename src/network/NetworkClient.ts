@@ -55,14 +55,10 @@ export class NetworkClient {
     if (envUrl) {
       this.serverUrl = envUrl;
     } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      // In local dev, default to local port 8080 (falls back to Railway if local server is down)
+      // In local dev on desktop, default to local port 8080 (falls back to Railway if local server is down)
       this.serverUrl = 'ws://localhost:8080';
-    } else if (window.location.host.includes('railway.app')) {
-      // Direct same-host WebSocket when served from Railway
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      this.serverUrl = `${protocol}//${window.location.host}`;
     } else {
-      // Production live cloud server on Railway
+      // For any cloud or mobile client, ALWAYS connect via secure WebSocket (wss://) to Railway
       this.serverUrl = 'wss://sector-234-production.up.railway.app';
     }
   }
@@ -76,16 +72,37 @@ export class NetworkClient {
 
       console.log(`[NET-CLIENT] Connecting to game server at ${this.serverUrl}...`);
 
+      let hasResolved = false;
+      const safeResolve = (val: boolean) => {
+        if (!hasResolved) {
+          hasResolved = true;
+          clearTimeout(timeoutId);
+          resolve(val);
+        }
+      };
+
+      const timeoutId = setTimeout(() => {
+        if (!hasResolved) {
+          console.warn('[NET-CLIENT] Connection attempt timed out.');
+          if (this.serverUrl.includes('localhost')) {
+            this.serverUrl = 'wss://sector-234-production.up.railway.app';
+            this.connect().then(safeResolve);
+            return;
+          }
+          safeResolve(false);
+        }
+      }, 7000);
+
       try {
         this.ws = new WebSocket(this.serverUrl);
       } catch (e) {
         console.error('[NET-CLIENT] WebSocket instantiation failed:', e);
         if (this.serverUrl !== 'wss://sector-234-production.up.railway.app') {
           this.serverUrl = 'wss://sector-234-production.up.railway.app';
-          this.connect().then(resolve);
+          this.connect().then(safeResolve);
           return;
         }
-        resolve(false);
+        safeResolve(false);
         return;
       }
 
@@ -93,7 +110,7 @@ export class NetworkClient {
         console.log('[NET-CLIENT] Connected to server successfully!');
         this.isConnected = true;
         this.startPingLoop();
-        resolve(true);
+        safeResolve(true);
       };
 
       this.ws.onclose = () => {
@@ -104,15 +121,15 @@ export class NetworkClient {
 
       this.ws.onerror = (err) => {
         console.error('[NET-CLIENT] WebSocket error:', err);
-        // If local dev server was not started, seamlessly switch to Railway cloud!
+        // If local dev server was not reachable, seamlessly fallback to live Railway cloud!
         if (this.serverUrl.includes('localhost') && this.serverUrl !== 'wss://sector-234-production.up.railway.app') {
           console.log('[NET-CLIENT] Local server unavailable. Seamlessly switching to live Railway cloud server...');
           this.serverUrl = 'wss://sector-234-production.up.railway.app';
-          this.connect().then(resolve);
+          this.connect().then(safeResolve);
           return;
         }
         this.isConnected = false;
-        resolve(false);
+        safeResolve(false);
       };
 
       this.ws.onmessage = (event) => {
