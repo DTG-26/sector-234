@@ -49,7 +49,7 @@ weaponSystem.onVaultHit = (dmg) => {
 // 3. UI and Inputs
 const input = new InputManager(document.getElementById('webgl-canvas')!, engine.cameraSystem.camera);
 const hud = new HUDCanvas('hud-canvas', engine.cameraSystem.camera);
-const menu = new MenuOverlay('ui-overlay');
+const menu = new MenuOverlay('ui-overlay', audio);
 
 // Connect floating damage text callback
 weaponSystem.onDamageDealt = (x, y, text, color) => {
@@ -91,6 +91,11 @@ const startMatch = (opts: MenuStartOptions) => {
   }
 
   localPlayer = modeManager.initMatch(opts.modeType, opts.gamerTag, opts.rigType, opts.mapId);
+  if (opts.primaryWeapon && localPlayer) {
+    localPlayer.stats.primaryWeapon = opts.primaryWeapon;
+    localPlayer.stats.activeWeapon = opts.primaryWeapon;
+    localPlayer.mesh.setWeapon(opts.primaryWeapon);
+  }
   isGameActive = true;
 };
 

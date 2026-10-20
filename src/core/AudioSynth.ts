@@ -235,4 +235,55 @@ export class AudioSynth {
     osc.start(t);
     osc.stop(t + 0.07);
   }
+
+  // 8. Tactical UI Sound Suite
+  public playUIHover(): void {
+    if (!this.ensureContext() || !this.ctx || !this.masterGain) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1400, t);
+    gain.gain.setValueAtTime(0.04, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(t);
+    osc.stop(t + 0.03);
+  }
+
+  public playUISelect(): void {
+    if (!this.ensureContext() || !this.ctx || !this.masterGain) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(660, t);
+    osc.frequency.exponentialRampToValueAtTime(1320, t + 0.06);
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(t);
+    osc.stop(t + 0.09);
+  }
+
+  public playUIDeploy(): void {
+    if (!this.ensureContext() || !this.ctx || !this.masterGain) return;
+    const t = this.ctx.currentTime;
+
+    // Sub rumble
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(80, t);
+    osc.frequency.exponentialRampToValueAtTime(220, t + 0.25);
+    gain.gain.setValueAtTime(0.4, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(t);
+    osc.stop(t + 0.36);
+  }
 }
