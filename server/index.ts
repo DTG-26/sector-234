@@ -7,14 +7,83 @@ import type {
 } from '../src/network/NetworkTypes.ts';
 import { NetMessageType } from '../src/network/NetworkTypes.ts';
 
+import fs from 'fs';
+import path from 'path';
+
 const PORT = parseInt(process.env.PORT || '8080', 10);
+const DIST_DIR = path.resolve(process.cwd(), 'dist');
+
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+};
 
 const rooms: Map<string, Room> = new Map();
 const clientToRoom: Map<string, string> = new Map();
 const clientSockets: Map<string, WebSocket> = new Map();
 
-// HTTP server for Railway / Render healthchecks
+// HTTP server for serving the Vite Web App & health checks
 const server = http.createServer((req, res) => {
+  const reqUrl = req.url?.split('?')[0] || '/';
+
+  // 1. Healthcheck endpoints
+  if (reqUrl === '/health' || reqUrl === '/api/status') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'online',
+      game: 'XAG: PROTOCOL ZERO',
+      activeRooms: rooms.size,
+      uptimeSeconds: Math.round(process.uptime()),
+    }));
+    return;
+  }
+
+  // 2. Serve static files from dist
+  if (fs.existsSync(DIST_DIR)) {
+    let filePath = path.join(DIST_DIR, reqUrl === '/' ? 'index.html' : reqUrl);
+
+    // Prevent directory traversal
+    if (!filePath.startsWith(DIST_DIR)) {
+      res.writeHead(403);
+      res.end('Forbidden');
+      return;
+    }
+
+    // If file doesn't exist, fallback to index.html (SPA routing)
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+      filePath = path.join(DIST_DIR, 'index.html');
+    }
+
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+      const isAsset = reqUrl.startsWith('/assets/');
+
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Cache-Control': isAsset ? 'public, max-age=31536000, immutable' : 'no-cache',
+      });
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+  }
+
+  // Fallback healthcheck if dist hasn't been built yet
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
     status: 'online',

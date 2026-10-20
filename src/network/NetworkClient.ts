@@ -57,6 +57,10 @@ export class NetworkClient {
     } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       // In local dev, default to local port 8080 (falls back to Railway if local server is down)
       this.serverUrl = 'ws://localhost:8080';
+    } else if (window.location.host.includes('railway.app')) {
+      // Direct same-host WebSocket when served from Railway
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      this.serverUrl = `${protocol}//${window.location.host}`;
     } else {
       // Production live cloud server on Railway
       this.serverUrl = 'wss://sector-234-production.up.railway.app';

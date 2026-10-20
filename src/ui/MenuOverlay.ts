@@ -15,6 +15,8 @@ export interface MenuStartOptions {
   secondaryWeapon?: WeaponId;
   isMultiplayer?: boolean;
   roomId?: string;
+  fillBots?: boolean;
+  teamSize?: number;
 }
 
 const WEAPON_CYCLE: WeaponId[] = [
@@ -37,10 +39,12 @@ export class MenuOverlay {
 
   private selectedGamerTag: string = 'XAG_001';
   private selectedRig: MovementRigType = MovementRigType.BREACH_BOOSTER;
-  private selectedMode: GameModeType = GameModeType.ODOGWU_STASH;
+  private selectedMode: GameModeType = GameModeType.TEAM_DEATHMATCH;
   private selectedMap: MapId = MapId.BIRNIN_KANO;
   private selectedWeapon: WeaponId = WeaponId.RIFLE_XAG47;
   private selectedSecondaryWeapon: WeaponId = WeaponId.SHOTGUN_AA12;
+  private fillBots: boolean = true;
+  private teamSize: number = 3;
 
   private radarAnimId: number | null = null;
 
@@ -68,7 +72,6 @@ export class MenuOverlay {
     const profile = OperativeService.getInstance().getProfile();
     this.selectedGamerTag = profile.call_sign || 'XAG_001';
 
-    // Stop any previous radar loop
     if (this.radarAnimId !== null) {
       cancelAnimationFrame(this.radarAnimId);
       this.radarAnimId = null;
@@ -79,1093 +82,739 @@ export class MenuOverlay {
 
     this.container.innerHTML = `
       <style>
-        @keyframes pulseMilitaryLed {
-          0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 6px #22c55e); }
-          50% { opacity: 0.35; transform: scale(0.85); filter: drop-shadow(0 0 2px #22c55e); }
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700;800;900&family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap');
+
+        @keyframes subtlePulseGlow {
+          0%, 100% { box-shadow: 0 0 25px rgba(34, 197, 94, 0.45); }
+          50% { box-shadow: 0 0 45px rgba(34, 197, 94, 0.8); }
         }
-        @keyframes deployHazardGlow {
-          0%, 100% { box-shadow: 0 0 25px rgba(0, 135, 81, 0.5), inset 0 0 15px rgba(34, 197, 94, 0.3); }
-          50% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.8), inset 0 0 25px rgba(255, 255, 255, 0.3); }
+        @keyframes cyanPulseGlow {
+          0%, 100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.35); }
+          50% { box-shadow: 0 0 35px rgba(6, 182, 212, 0.7); }
         }
 
-        .xag-war-room {
+        .xag-menu-root {
           position: absolute;
           inset: 0;
-          background: #050806;
-          background-image: 
-            linear-gradient(rgba(0, 135, 81, 0.07) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 135, 81, 0.07) 1px, transparent 1px);
-          background-size: 32px 32px;
+          background: radial-gradient(circle at 50% 25%, #0f1724 0%, #080d14 70%, #030508 100%);
           display: flex;
           flex-direction: column;
           z-index: 100;
-          padding: 12px 18px;
+          padding: 16px 24px;
           pointer-events: auto;
           box-sizing: border-box;
-          overflow: hidden;
-          font-family: 'JetBrains Mono', 'Chakra Petch', monospace;
-          color: #f4f4f5;
+          overflow-y: auto;
+          font-family: 'Inter', -apple-system, sans-serif;
+          color: #f1f5f9;
           user-select: none;
         }
 
-        /* Scanline Overlay */
-        .xag-war-room::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0px, rgba(0, 0, 0, 0.22) 1px, transparent 1px, transparent 2px);
-          pointer-events: none;
-          z-index: 1;
-        }
-
-        /* Top Status Bar */
-        .xag-top-bar {
-          position: relative;
-          z-index: 2;
+        /* Top Header Navigation */
+        .xag-nav-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 8px 16px;
-          background: #0a100d;
-          border: 1px solid #1c2b22;
-          border-radius: 4px;
-          box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
-          margin-bottom: 12px;
+          background: rgba(15, 23, 42, 0.8);
+          backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
+          padding: 10px 20px;
+          margin-bottom: 16px;
           flex-shrink: 0;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         }
 
-        .xag-brand-tag {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .xag-badge {
-          background: #008751;
-          color: #ffffff;
-          font-weight: 900;
-          font-size: 11px;
-          padding: 3px 8px;
-          border-radius: 2px;
-          letter-spacing: 1.5px;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .xag-title {
-          font-family: 'Chakra Petch', sans-serif;
-          font-weight: 900;
-          font-size: 18px;
-          letter-spacing: 2px;
-          color: #ffffff;
-        }
-        .xag-sub {
-          font-size: 10px;
-          color: #22c55e;
-          letter-spacing: 1px;
-          font-weight: 700;
-        }
-
-        .xag-net-status {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background: rgba(0, 135, 81, 0.12);
-          border: 1px solid rgba(34, 197, 94, 0.35);
-          padding: 5px 14px;
-          border-radius: 3px;
-          font-size: 11px;
-          color: #22c55e;
-          font-weight: 800;
-          letter-spacing: 1px;
-        }
-        .xag-net-led {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #22c55e;
-          animation: pulseMilitaryLed 1.8s infinite ease-in-out;
-        }
-
-        .xag-vault-badge {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          background: rgba(10, 16, 13, 0.85);
-          border: 1px solid #1c2b22;
-          padding: 5px 14px;
-          border-radius: 3px;
-          cursor: pointer;
-          transition: 0.15s;
-        }
-        .xag-vault-badge:hover {
-          background: rgba(0, 135, 81, 0.2);
-          border-color: #22c55e;
-          transform: translateY(-1px);
-        }
-        .xag-vault-val {
-          color: #22c55e;
-          font-size: 14px;
-          font-weight: 900;
-          letter-spacing: 1px;
-        }
-
-        /* 3-Column Command Grid */
-        .xag-grid-container {
-          position: relative;
-          z-index: 2;
-          display: grid;
-          grid-template-columns: 1fr 1.25fr 1fr;
-          gap: 14px;
-          flex: 1;
-          min-height: 0;
-          box-sizing: border-box;
-        }
-
-        .xag-column {
-          background: #0a100d;
-          border: 1px solid #1c2b22;
-          border-radius: 4px;
-          display: flex;
-          flex-direction: column;
-          padding: 14px;
-          box-sizing: border-box;
-          overflow-y: auto;
-          box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.5);
-        }
-
-        .xag-column::-webkit-scrollbar {
-          width: 4px;
-        }
-        .xag-column::-webkit-scrollbar-thumb {
-          background: #008751;
-          border-radius: 2px;
-        }
-
-        .xag-col-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border-bottom: 1px solid #1c2b22;
-          padding-bottom: 8px;
-          margin-bottom: 14px;
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: 2px;
-          color: #22c55e;
-          text-transform: uppercase;
-        }
-        .xag-col-sublabel {
-          font-size: 10px;
-          color: #ffffff;
-          font-weight: 700;
-          letter-spacing: 1px;
-        }
-
-        /* Dossier Elements */
-        .xag-section-label {
-          font-size: 10px;
-          font-weight: 800;
-          color: #9ca3af;
-          letter-spacing: 1.5px;
-          margin-bottom: 6px;
-          text-transform: uppercase;
-          display: flex;
-          justify-content: space-between;
-        }
-
-        .xag-input-box {
-          display: flex;
-          align-items: center;
-          background: #050806;
-          border: 1.5px solid #1c2b22;
-          border-radius: 3px;
-          padding: 6px 10px;
-          margin-bottom: 16px;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .xag-input-box:focus-within {
-          border-color: #22c55e;
-          box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
-        }
-        .xag-callsign-input {
-          flex: 1;
-          background: transparent;
-          border: none;
-          color: #ffffff;
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 14px;
-          font-weight: 800;
-          outline: none;
-          letter-spacing: 1px;
-        }
-        .xag-edit-btn {
-          background: rgba(0, 135, 81, 0.25);
-          border: 1px solid #008751;
-          color: #ffffff;
-          font-size: 10px;
-          font-weight: 800;
-          padding: 3px 8px;
-          border-radius: 2px;
-          cursor: pointer;
-          transition: 0.1s;
-          letter-spacing: 1px;
-        }
-        .xag-edit-btn:hover {
-          background: #008751;
-          color: #ffffff;
-        }
-
-        /* Weapon Primary Card */
-        .xag-weapon-card {
-          background: #050806;
-          border: 1.5px solid #1c2b22;
-          border-radius: 4px;
-          padding: 10px 12px;
-          margin-bottom: 16px;
-          cursor: pointer;
-          transition: 0.15s;
-        }
-        .xag-weapon-card:hover {
-          border-color: #22c55e;
-          box-shadow: 0 0 15px rgba(34, 197, 94, 0.25);
-        }
-        .xag-weapon-head {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 6px;
-        }
-        .xag-weapon-name {
-          font-size: 13px;
-          font-weight: 900;
-          color: #ffffff;
-          letter-spacing: 1px;
-        }
-        .xag-cycle-btn {
-          background: #008751;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          color: #ffffff;
-          font-size: 10px;
-          font-weight: 900;
-          padding: 4px 10px;
-          border-radius: 2px;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          cursor: pointer;
-          transition: 0.15s;
-          letter-spacing: 1px;
-        }
-        .xag-cycle-btn:hover {
-          background: #16a34a;
-          color: #ffffff;
-        }
-
-        .xag-weapon-stats {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 6px;
-          font-size: 10px;
-          color: #9ca3af;
-          margin-top: 8px;
-        }
-        .xag-stat-bar-bg {
-          height: 5px;
-          background: #1c2b22;
-          border-radius: 2px;
-          overflow: hidden;
-          margin-top: 2px;
-        }
-        .xag-stat-bar-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #008751 0%, #16a34a 75%, #22c55e 100%);
-          border-radius: 2px;
-          box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
-        }
-
-        /* Armory Button */
-        .xag-armory-btn {
-          margin-top: auto;
-          background: #050806;
-          border: 1.5px solid #1c2b22;
-          border-radius: 4px;
-          padding: 12px;
-          color: #ffffff;
-          cursor: pointer;
-          transition: 0.15s;
+        .xag-nav-brand {
           display: flex;
           align-items: center;
           gap: 12px;
         }
-        .xag-armory-btn:hover {
-          border-color: #22c55e;
-          background: rgba(0, 135, 81, 0.12);
-          box-shadow: 0 0 20px rgba(34, 197, 94, 0.25);
-          transform: translateY(-1px);
-        }
-        .xag-armory-icon {
-          font-size: 14px;
-          color: #22c55e;
+        .xag-nav-logo {
+          font-family: 'Chakra Petch', sans-serif;
+          font-size: 22px;
           font-weight: 900;
+          letter-spacing: 2px;
+          background: linear-gradient(135deg, #ffffff 30%, #4ade80 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
         }
-        .xag-armory-title {
-          font-size: 12px;
-          font-weight: 900;
-          color: #ffffff;
-          letter-spacing: 1px;
-        }
-        .xag-armory-sub {
+        .xag-nav-pill {
+          background: rgba(34, 197, 94, 0.2);
+          border: 1px solid #22c55e;
+          color: #4ade80;
           font-size: 10px;
-          color: #9ca3af;
+          font-weight: 800;
+          padding: 3px 8px;
+          border-radius: 6px;
+          letter-spacing: 1px;
         }
 
-        /* Theater / Map Cards */
-        .xag-map-card {
-          background: #050806;
-          border: 1.5px solid #1c2b22;
-          border-radius: 4px;
-          padding: 10px;
-          margin-bottom: 12px;
-          cursor: pointer;
-          transition: 0.15s;
-          position: relative;
-          overflow: hidden;
-        }
-        .xag-map-card:hover {
-          border-color: rgba(34, 197, 94, 0.6);
-        }
-        .xag-map-card.active {
-          border: 2px solid #22c55e;
-          box-shadow: 0 0 20px rgba(0, 135, 81, 0.4);
-          background: rgba(0, 135, 81, 0.15);
-        }
-        .xag-map-radar-frame {
-          width: 100%;
-          height: 80px;
-          background: #040705;
-          border: 1px solid #1c2b22;
-          border-radius: 2px;
-          margin-bottom: 8px;
-          position: relative;
-          overflow: hidden;
-        }
-        .xag-map-title {
-          font-size: 13px;
-          font-weight: 900;
-          letter-spacing: 1px;
-          color: #ffffff;
+        .xag-profile-chip {
           display: flex;
-          justify-content: space-between;
           align-items: center;
+          gap: 10px;
+          background: rgba(30, 41, 59, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          padding: 6px 14px;
+          border-radius: 20px;
         }
-        .xag-map-bounty {
-          font-size: 10px;
-          font-weight: 800;
-          color: #22c55e;
-          background: rgba(0, 135, 81, 0.2);
-          border: 1px solid #008751;
-          padding: 2px 7px;
-          border-radius: 2px;
-        }
-        .xag-map-desc {
-          font-size: 10px;
-          color: #9ca3af;
-          margin-top: 4px;
-        }
-
-        /* Mode Selector Sub-grid */
-        .xag-mode-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 6px;
-          margin-top: auto;
-        }
-        .xag-mode-pill {
-          background: #050806;
-          border: 1px solid #1c2b22;
-          border-radius: 3px;
-          padding: 8px 4px;
-          text-align: center;
-          cursor: pointer;
-          transition: 0.15s;
-          color: #9ca3af;
-        }
-        .xag-mode-pill:hover {
-          border-color: #22c55e;
+        .xag-callsign-display {
+          background: transparent;
+          border: none;
           color: #ffffff;
-        }
-        .xag-mode-pill.active {
-          border: 1.5px solid #22c55e;
-          background: rgba(0, 135, 81, 0.2);
-          color: #22c55e;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 13px;
           font-weight: 800;
-        }
-        .xag-mode-name {
-          font-size: 10px;
-          font-weight: 800;
+          outline: none;
+          width: 100px;
           letter-spacing: 0.5px;
         }
+        .xag-callsign-display:focus {
+          border-bottom: 1px solid #38bdf8;
+        }
 
-        /* Rig Cards */
-        .xag-rig-card {
-          background: #050806;
-          border: 1.5px solid #1c2b22;
-          border-radius: 4px;
-          padding: 9px 12px;
-          margin-bottom: 8px;
+        .xag-nav-right {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .xag-cash-chip {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(16, 185, 129, 0.15);
+          border: 1px solid rgba(16, 185, 129, 0.35);
+          padding: 6px 14px;
+          border-radius: 20px;
           cursor: pointer;
-          transition: 0.15s;
+          transition: all 0.2s;
+        }
+        .xag-cash-chip:hover {
+          background: rgba(16, 185, 129, 0.3);
+          transform: translateY(-1px);
+        }
+        .xag-cash-val {
+          color: #34d399;
+          font-family: 'JetBrains Mono', monospace;
+          font-weight: 900;
+          font-size: 13px;
+        }
+
+        .xag-server-chip {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(34, 197, 94, 0.1);
+          border: 1px solid rgba(34, 197, 94, 0.3);
+          padding: 6px 12px;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 700;
+          color: #4ade80;
+        }
+        .xag-led-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #22c55e;
+          box-shadow: 0 0 8px #22c55e;
+        }
+
+        /* Center Hub Content */
+        .xag-center-hub {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          max-width: 1100px;
+          width: 100%;
+          margin: 0 auto;
+          flex: 1;
+        }
+
+        /* Section Headers */
+        .xag-section-title {
+          font-family: 'Chakra Petch', sans-serif;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 2px;
+          color: #94a3b8;
+          text-transform: uppercase;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 4px;
+        }
+
+        /* Mode Selection Grid */
+        .xag-mode-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 14px;
+        }
+
+        .xag-mode-card {
+          background: rgba(15, 23, 42, 0.65);
+          backdrop-filter: blur(12px);
+          border: 1.5px solid rgba(255, 255, 255, 0.08);
+          border-radius: 12px;
+          padding: 16px;
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          overflow: hidden;
+        }
+        .xag-mode-card:hover {
+          border-color: rgba(56, 189, 248, 0.6);
+          transform: translateY(-2px);
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+        }
+        .xag-mode-card.active {
+          background: linear-gradient(145deg, rgba(16, 185, 129, 0.18) 0%, rgba(15, 23, 42, 0.8) 100%);
+          border: 2px solid #22c55e;
+          box-shadow: 0 0 30px rgba(34, 197, 94, 0.35);
+        }
+
+        .xag-mode-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+        .xag-mode-icon {
+          font-size: 26px;
+        }
+        .xag-mode-badge {
+          font-size: 9px;
+          font-weight: 800;
+          padding: 3px 8px;
+          border-radius: 4px;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+        }
+        .xag-badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+        .xag-badge-purple { background: rgba(192, 132, 252, 0.2); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.4); }
+        .xag-badge-red { background: rgba(248, 113, 113, 0.2); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.4); }
+        .xag-badge-gold { background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); }
+
+        .xag-mode-title {
+          font-family: 'Chakra Petch', sans-serif;
+          font-size: 15px;
+          font-weight: 800;
+          color: #ffffff;
+          margin-bottom: 6px;
+        }
+        .xag-mode-desc {
+          font-size: 11px;
+          color: #94a3b8;
+          line-height: 1.4;
+          flex: 1;
+        }
+        .xag-mode-status {
+          margin-top: 12px;
+          font-size: 11px;
+          font-weight: 800;
+          color: #64748b;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .xag-mode-card.active .xag-mode-status {
+          color: #22c55e;
+        }
+
+        /* Match Settings Bar (Bots & Map) */
+        .xag-settings-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+
+        .xag-settings-box {
+          background: rgba(15, 23, 42, 0.65);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 12px;
+          padding: 14px 18px;
           display: flex;
           align-items: center;
           justify-content: space-between;
         }
-        .xag-rig-card:hover {
-          border-color: rgba(34, 197, 94, 0.6);
-        }
-        .xag-rig-card.active {
-          border: 2px solid #22c55e;
-          box-shadow: 0 0 15px rgba(0, 135, 81, 0.35);
-          background: rgba(0, 135, 81, 0.15);
-        }
-        .xag-rig-info {
+
+        .xag-toggle-btn {
+          background: #1e293b;
+          border: 1.5px solid #334155;
+          color: #94a3b8;
+          font-family: 'Chakra Petch', sans-serif;
+          font-size: 12px;
+          font-weight: 800;
+          padding: 8px 16px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
           display: flex;
           align-items: center;
           gap: 8px;
         }
-        .xag-rig-name {
+        .xag-toggle-btn.active {
+          background: rgba(34, 197, 94, 0.2);
+          border-color: #22c55e;
+          color: #4ade80;
+          box-shadow: 0 0 15px rgba(34, 197, 94, 0.3);
+        }
+
+        .xag-map-selector {
+          display: flex;
+          gap: 8px;
+        }
+        .xag-map-pill {
+          background: #1e293b;
+          border: 1.5px solid #334155;
+          color: #94a3b8;
           font-size: 12px;
-          font-weight: 800;
-          color: #ffffff;
-          letter-spacing: 1px;
-        }
-        .xag-rig-card.active .xag-rig-name {
-          color: #22c55e;
-        }
-        .xag-rig-tag {
-          font-size: 9px;
-          color: #6b7280;
           font-weight: 700;
-        }
-        .xag-rig-card.active .xag-rig-tag {
-          color: #22c55e;
-          font-weight: 800;
-        }
-
-        /* Tactical Giant Deploy Button */
-        .xag-deploy-container {
-          margin-top: auto;
-          padding-top: 10px;
-          border-top: 1px solid #1c2b22;
-        }
-        .xag-deploy-btn {
-          width: 100%;
-          background: repeating-linear-gradient(
-            -45deg,
-            #008751,
-            #008751 16px,
-            #007345 16px,
-            #007345 32px
-          );
-          color: #ffffff;
-          font-family: 'Chakra Petch', 'JetBrains Mono', sans-serif;
-          font-size: 16px;
-          font-weight: 900;
-          letter-spacing: 3px;
-          padding: 16px 14px;
-          border: 1px solid rgba(255, 255, 255, 0.25);
+          padding: 8px 14px;
+          border-radius: 8px;
           cursor: pointer;
-          text-align: center;
-          text-transform: uppercase;
-          clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
-          animation: deployHazardGlow 2.5s infinite ease-in-out;
-          transition: filter 0.15s, transform 0.1s;
+          transition: all 0.2s;
         }
-        .xag-deploy-btn:hover {
-          filter: brightness(1.22);
-          transform: scale(1.02);
-        }
-        .xag-deploy-btn:active {
-          transform: scale(0.98);
-        }
-        .xag-deploy-decor {
-          font-size: 9px;
-          color: rgba(255, 255, 255, 0.85);
-          letter-spacing: 4px;
-          margin-bottom: 2px;
-          font-weight: 800;
+        .xag-map-pill.active {
+          background: rgba(56, 189, 248, 0.2);
+          border-color: #38bdf8;
+          color: #ffffff;
+          box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
         }
 
-        .xag-online-btn {
-          width: 100%;
-          margin-top: 8px;
-          background: linear-gradient(135deg, rgba(6, 182, 212, 0.22) 0%, rgba(14, 116, 144, 0.38) 100%);
-          border: 1px solid #06b6d4;
-          color: #38bdf8;
-          font-family: 'Chakra Petch', 'JetBrains Mono', sans-serif;
-          font-size: 13px;
-          font-weight: 800;
+        /* Action Launch Buttons */
+        .xag-actions-row {
+          display: grid;
+          grid-template-columns: 1.6fr 1.2fr;
+          gap: 14px;
+          margin-top: 4px;
+        }
+
+        .xag-btn-play {
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          border: none;
+          color: #ffffff;
+          font-family: 'Chakra Petch', sans-serif;
+          font-size: 18px;
+          font-weight: 900;
           letter-spacing: 2px;
-          padding: 11px 12px;
+          padding: 16px 24px;
+          border-radius: 12px;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
-          transition: all 0.2s ease;
-          clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-          box-shadow: 0 0 12px rgba(6, 182, 212, 0.2);
+          gap: 12px;
+          transition: all 0.2s;
+          animation: subtlePulseGlow 2.5s infinite ease-in-out;
         }
-        .xag-online-btn:hover {
-          background: linear-gradient(135deg, rgba(6, 182, 212, 0.45) 0%, rgba(14, 116, 144, 0.65) 100%);
-          filter: drop-shadow(0 0 14px rgba(6, 182, 212, 0.7));
-          transform: scale(1.02);
+        .xag-btn-play:hover {
+          filter: brightness(1.15);
+          transform: translateY(-2px);
         }
-        .xag-online-btn:active {
-          transform: scale(0.98);
-        }
-        .xag-pulse-indicator {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #06b6d4;
-          box-shadow: 0 0 8px #06b6d4;
-          animation: pulseMilitaryLed 1.5s infinite;
+        .xag-btn-play:active {
+          transform: translateY(1px);
         }
 
-        /* Mobile Segmented Control Bar */
-        .xag-mobile-tabs {
-          display: none;
+        .xag-btn-online {
+          background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+          border: 1.5px solid #38bdf8;
+          color: #ffffff;
+          font-family: 'Chakra Petch', sans-serif;
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: 1.5px;
+          padding: 16px 20px;
+          border-radius: 12px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          transition: all 0.2s;
+          animation: cyanPulseGlow 3s infinite ease-in-out;
+        }
+        .xag-btn-online:hover {
+          filter: brightness(1.2);
+          transform: translateY(-2px);
+        }
+        .xag-btn-online:active {
+          transform: translateY(1px);
         }
 
-        .xag-mobile-deploy-bar {
-          display: none;
+        /* Bottom Loadout Dock */
+        .xag-loadout-dock {
+          background: rgba(15, 23, 42, 0.75);
+          backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
+          padding: 14px 18px;
+          display: grid;
+          grid-template-columns: 1fr 1fr 1.5fr auto;
+          gap: 16px;
+          align-items: center;
+          margin-top: 4px;
         }
 
-        /* Responsive Mobile Styling (< 860px) */
+        .xag-loadout-item {
+          background: rgba(30, 41, 59, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 8px;
+          padding: 8px 12px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .xag-loadout-item:hover {
+          border-color: #38bdf8;
+          background: rgba(30, 41, 59, 0.8);
+        }
+        .xag-swap-badge {
+          background: #334155;
+          color: #94a3b8;
+          font-size: 9px;
+          font-weight: 800;
+          padding: 3px 6px;
+          border-radius: 4px;
+        }
+
+        .xag-rig-selector {
+          display: flex;
+          gap: 6px;
+        }
+        .xag-rig-pill {
+          flex: 1;
+          background: rgba(30, 41, 59, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 8px;
+          padding: 8px 6px;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .xag-rig-pill:hover {
+          border-color: #38bdf8;
+        }
+        .xag-rig-pill.active {
+          background: rgba(34, 197, 94, 0.2);
+          border-color: #22c55e;
+          box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+        }
+        .xag-rig-pill-name {
+          font-size: 11px;
+          font-weight: 800;
+          color: #ffffff;
+        }
+        .xag-rig-pill.active .xag-rig-pill-name {
+          color: #4ade80;
+        }
+
+        .xag-armory-btn {
+          background: rgba(251, 191, 36, 0.15);
+          border: 1px solid #fbbf24;
+          color: #fde047;
+          font-family: 'Chakra Petch', sans-serif;
+          font-size: 12px;
+          font-weight: 800;
+          padding: 10px 14px;
+          border-radius: 8px;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: all 0.15s;
+        }
+        .xag-armory-btn:hover {
+          background: rgba(251, 191, 36, 0.3);
+        }
+
+        /* Mobile Adjustments (< 860px) */
         @media screen and (max-width: 860px) {
-          .xag-war-room {
-            padding: 8px 10px calc(76px + env(safe-area-inset-bottom, 8px));
-          }
-
-          /* Compact Single-Row Mobile Header */
-          .xag-top-bar {
-            flex-direction: row;
-            align-items: center;
-            justify-content: space-between;
-            padding: 6px 10px;
-            margin-bottom: 8px;
-            gap: 6px;
-          }
-          .xag-brand-tag {
-            gap: 6px;
-          }
-          .xag-badge {
-            font-size: 10px;
-            padding: 2px 6px;
-          }
-          .xag-title {
-            font-size: 12px;
-            letter-spacing: 1px;
-            white-space: nowrap;
-          }
-          .xag-sub {
-            display: none;
-          }
-          .xag-net-status {
-            padding: 4px 7px;
-            font-size: 9px;
-            letter-spacing: 0.5px;
-          }
-          .xag-vault-badge {
-            padding: 4px 8px;
-            gap: 5px;
-          }
-          .xag-vault-label-text {
-            display: none;
-          }
-          .xag-vault-val {
-            font-size: 11px;
-          }
-
-          /* Show Mobile Segmented Tabs */
-          .xag-mobile-tabs {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 8px;
-            flex-shrink: 0;
-            z-index: 2;
-            position: relative;
-          }
-          .xag-tab-btn {
-            flex: 1;
-            background: #0a100d;
-            border: 1px solid #1c2b22;
-            color: #9ca3af;
-            padding: 8px 4px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 800;
-            font-family: 'JetBrains Mono', 'Chakra Petch', monospace;
-            cursor: pointer;
-            text-align: center;
-            transition: 0.15s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-            letter-spacing: 1px;
-          }
-          .xag-tab-btn:hover {
-            color: #ffffff;
-            border-color: rgba(34, 197, 94, 0.5);
-          }
-          .xag-tab-btn.active {
-            background: rgba(0, 135, 81, 0.22);
-            border-color: #22c55e;
-            color: #22c55e;
-            box-shadow: 0 0 14px rgba(34, 197, 94, 0.25);
-          }
-          .xag-tab-num {
-            font-size: 9px;
-            padding: 1px 4px;
-            background: rgba(0, 135, 81, 0.35);
-            border-radius: 2px;
-            color: #ffffff;
-          }
-
-          /* Tab-Driven Column Visibility */
-          .xag-grid-container {
-            display: flex;
-            flex-direction: column;
-            gap: 0;
-            flex: 1;
-            min-height: 0;
-            overflow: hidden;
-          }
-          .xag-column {
-            display: none;
-            width: 100%;
-            height: 100%;
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-            padding: 10px 12px;
-            border-radius: 4px;
-          }
-          .xag-column.mobile-active {
-            display: flex;
-          }
-
-          /* Hide Column 3 internal deploy button on mobile (handled by sticky bar) */
-          .xag-column .xag-deploy-container {
-            display: none;
-          }
-
-          /* Show Persistent Mobile Deploy Bar */
-          .xag-mobile-deploy-bar {
-            display: block;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 8px));
-            background: linear-gradient(180deg, transparent 0%, rgba(5, 8, 6, 0.94) 28%, #050806 100%);
-            z-index: 99;
-            backdrop-filter: blur(8px);
-          }
-          .xag-mobile-deploy-bar .xag-deploy-btn {
-            padding: 13px 14px;
-            font-size: 14px;
-            letter-spacing: 2px;
-          }
-
-          /* Touch Optimization for Weapon & Map Cards */
-          .xag-weapon-card {
-            padding: 8px 10px;
-            margin-bottom: 10px;
-          }
-          .xag-cycle-btn {
-            padding: 6px 12px;
-            font-size: 11px;
-          }
-          .xag-map-card {
-            padding: 8px 10px;
-            margin-bottom: 8px;
-          }
-          .xag-map-radar-frame {
-            height: 65px;
-          }
-          .xag-rig-card {
-            padding: 8px 10px;
-            margin-bottom: 6px;
-          }
-          .xag-input-box {
-            padding: 6px 8px;
-            margin-bottom: 10px;
-          }
-          .xag-armory-btn {
+          .xag-menu-root {
             padding: 10px;
-            margin-top: 6px;
           }
-        }
-
-        /* Ultra-compact Landscape Phone Breakpoint (height <= 500px) */
-        @media screen and (max-height: 500px) and (orientation: landscape) {
-          .xag-war-room {
-            padding: 4px 8px calc(52px + env(safe-area-inset-bottom, 4px));
+          .xag-nav-header {
+            padding: 8px 12px;
+            margin-bottom: 10px;
           }
-          .xag-top-bar {
-            padding: 3px 8px;
-            margin-bottom: 4px;
+          .xag-mode-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
           }
-          .xag-mobile-tabs {
-            margin-bottom: 4px;
+          .xag-settings-row {
+            grid-template-columns: 1fr;
+            gap: 10px;
           }
-          .xag-tab-btn {
-            padding: 4px 4px;
-            font-size: 10px;
+          .xag-actions-row {
+            grid-template-columns: 1fr;
+            gap: 10px;
           }
-          .xag-column {
-            padding: 6px 8px;
+          .xag-loadout-dock {
+            grid-template-columns: 1fr;
+            gap: 10px;
           }
-          .xag-map-radar-frame {
-            height: 48px;
-          }
-          .xag-mobile-deploy-bar {
-            padding: 4px 10px calc(4px + env(safe-area-inset-bottom, 4px));
-          }
-          .xag-mobile-deploy-bar .xag-deploy-btn {
-            padding: 8px 10px;
-            font-size: 12px;
-          }
-          .xag-mobile-deploy-bar .xag-deploy-decor {
-            display: none;
+          .xag-rig-selector {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
           }
         }
       </style>
 
-      <div class="xag-war-room">
-        <!-- Top Status Bar -->
-        <div class="xag-top-bar">
-          <div class="xag-brand-tag">
-            <span class="xag-badge">[XAG]</span>
-            <div>
-              <div class="xag-title">SECTOR 234 // PROTOCOL ZERO</div>
-              <div class="xag-sub">NIGERIAN SPEC-OPS 2.5D HEIST ARENA</div>
-            </div>
+      <div class="xag-menu-root">
+        <!-- Top Navigation Header -->
+        <header class="xag-nav-header">
+          <div class="xag-nav-brand">
+            <span class="xag-nav-logo">SECTOR 234</span>
+            <span class="xag-nav-pill">PROTOCOL ZERO</span>
           </div>
 
-          <div class="xag-net-status">
-            <div class="xag-net-led"></div>
-            <span>[● NET: LAGOS-1 (14ms)]</span>
+          <div class="xag-profile-chip" title="Click to edit your operative callsign">
+            <span style="font-size: 12px; color: #94a3b8;">CALLSIGN:</span>
+            <input id="xag-callsign-input" class="xag-callsign-display" type="text" maxlength="14" value="${this.selectedGamerTag}" spellcheck="false" />
+            <span style="font-size: 10px; background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 800; padding: 2px 6px; border-radius: 4px;">RANK ${profile.rank}</span>
           </div>
 
-          <div id="btn-top-vault" class="xag-vault-badge" title="Open Syndicate Offshore Vault">
-            <span style="font-size: 13px; color: #22c55e;">[◆]</span>
-            <div>
-              <div class="xag-vault-label-text" style="font-size: 9px; color: #9ca3af; font-weight: 700;">VAULT BALANCE</div>
-              <div class="xag-vault-val">₦${profile.cash_balance.toLocaleString()}</div>
+          <div class="xag-nav-right">
+            <div id="btn-top-vault" class="xag-cash-chip" title="Open Syndicate Offshore Vault">
+              <span>💰</span>
+              <span class="xag-cash-val">₦${profile.cash_balance.toLocaleString()}</span>
+            </div>
+            <div class="xag-server-chip">
+              <div class="xag-led-dot"></div>
+              <span>ONLINE</span>
             </div>
           </div>
-        </div>
+        </header>
 
-        <!-- Mobile Segmented Tabs Bar -->
-        <div class="xag-mobile-tabs">
-          <button type="button" class="xag-tab-btn active" data-tab="01">
-            <span class="xag-tab-num">01</span> LOADOUT
-          </button>
-          <button type="button" class="xag-tab-btn" data-tab="02">
-            <span class="xag-tab-num">02</span> THEATER
-          </button>
-          <button type="button" class="xag-tab-btn" data-tab="03">
-            <span class="xag-tab-num">03</span> MOBILITY
-          </button>
-        </div>
+        <!-- Center Battle Hub -->
+        <main class="xag-center-hub">
 
-        <!-- 3-Column Tactical Command Grid -->
-        <div class="xag-grid-container">
-
-          <!-- 01 // OPERATOR DOSSIER -->
-          <div id="col-dossier" class="xag-column mobile-active">
-            <div class="xag-col-header">
-              <span>01 // OPERATOR DOSSIER</span>
-              <span class="xag-col-sublabel">ID: #${profile.id ? profile.id.slice(-4).toUpperCase() : '234'}</span>
-            </div>
-
-            <!-- Callsign Input -->
-            <div class="xag-section-label">
-              <span>CALLSIGN ID:</span>
-              <span style="color: #22c55e;">RANK ${profile.rank}</span>
-            </div>
-            <div class="xag-input-box">
-              <input id="xag-callsign-input" class="xag-callsign-input" type="text" maxlength="16" value="${this.selectedGamerTag}" spellcheck="false" />
-              <button id="btn-edit-callsign" class="xag-edit-btn" title="Edit Callsign">[EDIT]</button>
-            </div>
-
-            <!-- Loadout Primary Weapon -->
-            <div class="xag-section-label">
-              <span>LOADOUT PRIMARY:</span>
-              <span id="weapon-cat-label" style="color: #22c55e; font-weight: 800;">${currentWeaponDef.category.toUpperCase()}</span>
-            </div>
-            <div id="weapon-select-card" class="xag-weapon-card">
-              <div class="xag-weapon-head">
-                <span id="weapon-name-display" class="xag-weapon-name">${currentWeaponDef.name.toUpperCase()}</span>
-                <button id="btn-cycle-weapon" class="xag-cycle-btn">[//] SWAP</button>
-              </div>
-              <div style="font-size: 10px; color: #9ca3af; line-height: 1.3;" id="weapon-desc-display">
-                ${currentWeaponDef.description}
-              </div>
-              <div class="xag-weapon-stats">
-                <div>
-                  <div style="display: flex; justify-content: space-between;">
-                    <span>DMG</span>
-                    <span id="stat-dmg-val" style="color: #ffffff; font-weight: 800;">${currentWeaponDef.damage}</span>
-                  </div>
-                  <div class="xag-stat-bar-bg"><div id="stat-dmg-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentWeaponDef.damage / 180) * 100)}%;"></div></div>
-                </div>
-                <div>
-                  <div style="display: flex; justify-content: space-between;">
-                    <span>ROF</span>
-                    <span id="stat-rof-val" style="color: #ffffff; font-weight: 800;">${Math.round(60 / currentWeaponDef.fireInterval)}</span>
-                  </div>
-                  <div class="xag-stat-bar-bg"><div id="stat-rof-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (0.4 / Math.max(0.06, currentWeaponDef.fireInterval)) * 100)}%;"></div></div>
-                </div>
-                <div>
-                  <div style="display: flex; justify-content: space-between;">
-                    <span>RNG</span>
-                    <span id="stat-rng-val" style="color: #ffffff; font-weight: 800;">${currentWeaponDef.range}m</span>
-                  </div>
-                  <div class="xag-stat-bar-bg"><div id="stat-rng-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentWeaponDef.range / 45) * 100)}%;"></div></div>
-                </div>
-                <div>
-                  <div style="display: flex; justify-content: space-between;">
-                    <span>MAG</span>
-                    <span id="stat-mag-val" style="color: #ffffff; font-weight: 800;">${currentWeaponDef.magSize}</span>
-                  </div>
-                  <div class="xag-stat-bar-bg"><div id="stat-mag-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentWeaponDef.magSize / 120) * 100)}%;"></div></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Loadout Secondary Weapon -->
-            <div class="xag-section-label" style="margin-top: 6px;">
-              <span>LOADOUT SECONDARY:</span>
-              <span id="sec-weapon-cat-label" style="color: #22c55e; font-weight: 800;">${currentSecWeaponDef.category.toUpperCase()}</span>
-            </div>
-            <div id="sec-weapon-select-card" class="xag-weapon-card">
-              <div class="xag-weapon-head">
-                <span id="sec-weapon-name-display" class="xag-weapon-name">${currentSecWeaponDef.name.toUpperCase()}</span>
-                <button id="btn-cycle-sec-weapon" class="xag-cycle-btn">[//] SWAP</button>
-              </div>
-              <div style="font-size: 10px; color: #9ca3af; line-height: 1.3;" id="sec-weapon-desc-display">
-                ${currentSecWeaponDef.description}
-              </div>
-              <div class="xag-weapon-stats">
-                <div>
-                  <div style="display: flex; justify-content: space-between;">
-                    <span>DMG</span>
-                    <span id="sec-stat-dmg-val" style="color: #ffffff; font-weight: 800;">${currentSecWeaponDef.damage}</span>
-                  </div>
-                  <div class="xag-stat-bar-bg"><div id="sec-stat-dmg-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentSecWeaponDef.damage / 180) * 100)}%;"></div></div>
-                </div>
-                <div>
-                  <div style="display: flex; justify-content: space-between;">
-                    <span>ROF</span>
-                    <span id="sec-stat-rof-val" style="color: #ffffff; font-weight: 800;">${Math.round(60 / currentSecWeaponDef.fireInterval)}</span>
-                  </div>
-                  <div class="xag-stat-bar-bg"><div id="sec-stat-rof-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (0.4 / Math.max(0.06, currentSecWeaponDef.fireInterval)) * 100)}%;"></div></div>
-                </div>
-                <div>
-                  <div style="display: flex; justify-content: space-between;">
-                    <span>RNG</span>
-                    <span id="sec-stat-rng-val" style="color: #ffffff; font-weight: 800;">${currentSecWeaponDef.range}m</span>
-                  </div>
-                  <div class="xag-stat-bar-bg"><div id="sec-stat-rng-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentSecWeaponDef.range / 45) * 100)}%;"></div></div>
-                </div>
-                <div>
-                  <div style="display: flex; justify-content: space-between;">
-                    <span>MAG</span>
-                    <span id="sec-stat-mag-val" style="color: #ffffff; font-weight: 800;">${currentSecWeaponDef.magSize}</span>
-                  </div>
-                  <div class="xag-stat-bar-bg"><div id="sec-stat-mag-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentSecWeaponDef.magSize / 120) * 100)}%;"></div></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Open Bank & Armory -->
-            <button id="btn-open-dossier" class="xag-armory-btn">
-              <span class="xag-armory-icon">[+]</span>
-              <div>
-                <div class="xag-armory-title">[ OPEN ARMORY & VAULT ]</div>
-                <div class="xag-armory-sub">Unlock Weapons & Spec-Ops Assets</div>
-              </div>
-            </button>
-          </div>
-
-          <!-- 02 // DEPLOYMENT THEATER -->
-          <div id="col-theater" class="xag-column">
-            <div class="xag-col-header">
-              <span>02 // DEPLOYMENT THEATER</span>
-              <span class="xag-col-sublabel">SECTOR MAP</span>
-            </div>
-
-            <!-- Birnin Kano Map Card -->
-            <div class="xag-map-card ${this.selectedMap === MapId.BIRNIN_KANO ? 'active' : ''}" data-map="BIRNIN_KANO">
-              <div class="xag-map-radar-frame">
-                <canvas id="radar-canvas-kano" width="280" height="80" style="width: 100%; height: 100%; display: block;"></canvas>
-              </div>
-              <div class="xag-map-title">
-                <span>[◆] BIRNIN KANO // 2099</span>
-                <span class="xag-map-bounty">₦1,000,000</span>
-              </div>
-              <div class="xag-map-desc">
-                Earthen Mud Citadel • Tubali Ramparts • Lime Zankwaye Horns • Treasury Vault
-              </div>
-            </div>
-
-            <!-- Lagos Map Card -->
-            <div class="xag-map-card ${this.selectedMap === MapId.LAGOS_GOSLOW ? 'active' : ''}" data-map="LAGOS_GOSLOW">
-              <div class="xag-map-radar-frame">
-                <canvas id="radar-canvas-lagos" width="280" height="80" style="width: 100%; height: 100%; display: block;"></canvas>
-              </div>
-              <div class="xag-map-title">
-                <span>[▲] LAGOS // EKO SECTOR</span>
-                <span class="xag-map-bounty">₦1,500,000</span>
-              </div>
-              <div class="xag-map-desc">
-                Expressway Traffic Gridlock • 3rd Mainland Flyover • Blackout Rain
-              </div>
-            </div>
-
-            <!-- Operation Contract Mode Selector -->
-            <div class="xag-section-label" style="margin-top: 6px;">
-              <span>OPERATION CONTRACT [MODE]:</span>
+          <!-- 1. Mode Selection Grid -->
+          <section>
+            <div class="xag-section-title">
+              <span>⚔️ SELECT GAME MODE</span>
             </div>
             <div class="xag-mode-grid">
-              <div class="xag-mode-pill ${this.selectedMode === GameModeType.ODOGWU_STASH ? 'active' : ''}" data-mode="ODOGWU_STASH">
-                <div class="xag-mode-name">[◆] SARKI HEIST</div>
-                <div style="font-size: 8px; color: #6b7280; margin-top: 2px;">3-Act Evac</div>
-              </div>
-              <div class="xag-mode-pill ${this.selectedMode === GameModeType.VAULT_HEIST ? 'active' : ''}" data-mode="VAULT_HEIST">
-                <div class="xag-mode-name">[▲] VAULT CRACK</div>
-                <div style="font-size: 8px; color: #6b7280; margin-top: 2px;">3v3 Strike</div>
-              </div>
-              <div class="xag-mode-pill ${this.selectedMode === GameModeType.APAPA_LOCKDOWN ? 'active' : ''}" data-mode="APAPA_LOCKDOWN">
-                <div class="xag-mode-name">[//] LOCKDOWN</div>
-                <div style="font-size: 8px; color: #6b7280; margin-top: 2px;">High-Yield</div>
-              </div>
-            </div>
-          </div>
 
-          <!-- 03 // TACTICAL RIG + DEPLOY LAUNCHER -->
-          <div id="col-rigs" class="xag-column">
-            <div class="xag-col-header">
-              <span>03 // TACTICAL RIG</span>
-              <span class="xag-col-sublabel">MOBILITY CORE</span>
-            </div>
-
-            <!-- Rig 1: Phase Dash (Specter) -->
-            <div class="xag-rig-card ${this.selectedRig === MovementRigType.PHASE_DASH ? 'active' : ''}" data-rig="${MovementRigType.PHASE_DASH}">
-              <div class="xag-rig-info">
-                <div>
-                  <div class="xag-rig-name">[▲] SPECTER // PHASE</div>
-                  <div style="font-size: 9px; color: #9ca3af;">High-speed tactical dash through thin covers</div>
+              <!-- 3v3 Team Deathmatch -->
+              <div class="xag-mode-card ${this.selectedMode === GameModeType.TEAM_DEATHMATCH && this.teamSize === 3 ? 'active' : ''}" data-mode="TEAM_DEATHMATCH" data-teamsize="3">
+                <div class="xag-mode-header">
+                  <span class="xag-mode-icon">👥</span>
+                  <span class="xag-mode-badge xag-badge-blue">COMPETITIVE</span>
+                </div>
+                <div class="xag-mode-title">3v3 TEAM DEATHMATCH</div>
+                <div class="xag-mode-desc">Blue vs Red tactical showdown. First team to 25 eliminations wins.</div>
+                <div class="xag-mode-status">
+                  <span>${this.selectedMode === GameModeType.TEAM_DEATHMATCH && this.teamSize === 3 ? '✓ SELECTED' : '○ CLICK TO SELECT'}</span>
                 </div>
               </div>
-              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.PHASE_DASH ? '[ACTIVE]' : '3.0s CD'}</div>
-            </div>
 
-            <!-- Rig 2: Breach Booster (Vanguard) -->
-            <div class="xag-rig-card ${this.selectedRig === MovementRigType.BREACH_BOOSTER ? 'active' : ''}" data-rig="${MovementRigType.BREACH_BOOSTER}">
-              <div class="xag-rig-info">
-                <div>
-                  <div class="xag-rig-name">[◆] VANGUARD // BREACH</div>
-                  <div style="font-size: 9px; color: #9ca3af;">Smashes 3 layers of mud/concrete walls</div>
+              <!-- 5v5 Team Deathmatch -->
+              <div class="xag-mode-card ${this.selectedMode === GameModeType.TEAM_DEATHMATCH && this.teamSize === 5 ? 'active' : ''}" data-mode="TEAM_DEATHMATCH" data-teamsize="5">
+                <div class="xag-mode-header">
+                  <span class="xag-mode-icon">⚔️</span>
+                  <span class="xag-mode-badge xag-badge-purple">10-PLAYER WAR</span>
+                </div>
+                <div class="xag-mode-title">5v5 TEAM DEATHMATCH</div>
+                <div class="xag-mode-desc">Full squad battleground. First team to 40 eliminations claims the sector.</div>
+                <div class="xag-mode-status">
+                  <span>${this.selectedMode === GameModeType.TEAM_DEATHMATCH && this.teamSize === 5 ? '✓ SELECTED' : '○ CLICK TO SELECT'}</span>
                 </div>
               </div>
-              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.BREACH_BOOSTER ? '[ACTIVE]' : '2.5s CD'}</div>
-            </div>
 
-            <!-- Rig 3: Glitch Anchor (Chronos) -->
-            <div class="xag-rig-card ${this.selectedRig === MovementRigType.GLITCH_ANCHOR ? 'active' : ''}" data-rig="${MovementRigType.GLITCH_ANCHOR}">
-              <div class="xag-rig-info">
-                <div>
-                  <div class="xag-rig-name">[⬢] CHRONOS // ANCHOR</div>
-                  <div style="font-size: 9px; color: #9ca3af;">Temporal snap-back repositioning beacon</div>
+              <!-- Free For All -->
+              <div class="xag-mode-card ${this.selectedMode === GameModeType.FREE_FOR_ALL ? 'active' : ''}" data-mode="FREE_FOR_ALL" data-teamsize="1">
+                <div class="xag-mode-header">
+                  <span class="xag-mode-icon">💀</span>
+                  <span class="xag-mode-badge xag-badge-red">DEATHMATCH</span>
+                </div>
+                <div class="xag-mode-title">FREE FOR ALL (SOLO)</div>
+                <div class="xag-mode-desc">Every operative for themselves. Eliminate everyone. First to 20 kills wins.</div>
+                <div class="xag-mode-status">
+                  <span>${this.selectedMode === GameModeType.FREE_FOR_ALL ? '✓ SELECTED' : '○ CLICK TO SELECT'}</span>
                 </div>
               </div>
-              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.GLITCH_ANCHOR ? '[ACTIVE]' : '4.0s CD'}</div>
-            </div>
 
-            <!-- Rig 4: Overdrive Slide (Striker) -->
-            <div class="xag-rig-card ${this.selectedRig === MovementRigType.OVERDRIVE_SLIDE ? 'active' : ''}" data-rig="${MovementRigType.OVERDRIVE_SLIDE}">
-              <div class="xag-rig-info">
-                <div>
-                  <div class="xag-rig-name">[▶] STRIKER // SLIDE</div>
-                  <div style="font-size: 9px; color: #9ca3af;">Kinetic power-slides + vertical wall-kicks</div>
+              <!-- Odogwu Heist -->
+              <div class="xag-mode-card ${this.selectedMode === GameModeType.ODOGWU_STASH ? 'active' : ''}" data-mode="ODOGWU_STASH" data-teamsize="3">
+                <div class="xag-mode-header">
+                  <span class="xag-mode-icon">💰</span>
+                  <span class="xag-mode-badge xag-badge-gold">HEIST OBJECTIVE</span>
+                </div>
+                <div class="xag-mode-title">ODOGWU HEIST</div>
+                <div class="xag-mode-desc">Breach the mud/concrete central vault, grab the cash bag & evac on the chopper.</div>
+                <div class="xag-mode-status">
+                  <span>${this.selectedMode === GameModeType.ODOGWU_STASH ? '✓ SELECTED' : '○ CLICK TO SELECT'}</span>
                 </div>
               </div>
-              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.OVERDRIVE_SLIDE ? '[ACTIVE]' : '1.5s CD'}</div>
-            </div>
 
-            <!-- Deploy Launcher Button -->
-            <div class="xag-deploy-container">
-              <button id="menu-deploy-btn" class="xag-deploy-btn">
-                <div class="xag-deploy-decor">◢█████████████████████◣</div>
-                <div>█  DEPLOY SOLO (BOTS) █</div>
-                <div class="xag-deploy-decor">◥█████████████████████◤</div>
-              </button>
-              <button id="menu-online-btn" class="xag-online-btn" type="button">
-                <span class="xag-pulse-indicator"></span>
-                <span>⚡ MULTIPLAYER ARENA (ONLINE LOBBY)</span>
+            </div>
+          </section>
+
+          <!-- 2. Match Settings (Bot Configuration & Map) -->
+          <section class="xag-settings-row">
+            <!-- Bot Fill Toggle -->
+            <div class="xag-settings-box">
+              <div>
+                <div style="font-weight: 800; font-size: 13px; color: #ffffff; margin-bottom: 2px;">🤖 PLAY WITH BOTS</div>
+                <div style="font-size: 11px; color: #94a3b8;">Fill empty slots with tactical AI bots</div>
+              </div>
+              <button id="btn-toggle-bots" type="button" class="xag-toggle-btn ${this.fillBots ? 'active' : ''}">
+                <span id="bot-toggle-text">${this.fillBots ? '✓ BOTS: ON' : '✕ BOTS: OFF'}</span>
               </button>
             </div>
 
-          </div>
+            <!-- Map Selection -->
+            <div class="xag-settings-box">
+              <div>
+                <div style="font-weight: 800; font-size: 13px; color: #ffffff; margin-bottom: 2px;">🗺️ SECTOR MAP</div>
+                <div style="font-size: 11px; color: #94a3b8;">Select your battle theater</div>
+              </div>
+              <div class="xag-map-selector">
+                <button type="button" class="xag-map-pill ${this.selectedMap === MapId.BIRNIN_KANO ? 'active' : ''}" data-map="BIRNIN_KANO">
+                  🏰 BIRNIN KANO
+                </button>
+                <button type="button" class="xag-map-pill ${this.selectedMap === MapId.LAGOS_GOSLOW ? 'active' : ''}" data-map="LAGOS_GOSLOW">
+                  🚗 LAGOS GO-SLOW
+                </button>
+              </div>
+            </div>
+          </section>
 
-        </div>
+          <!-- 3. Primary Actions (Play Solo/Bots vs Multiplayer Lobby) -->
+          <section class="xag-actions-row">
+            <button id="menu-deploy-btn" type="button" class="xag-btn-play">
+              <span style="font-size: 22px;">▶</span>
+              <span>PLAY MATCH (SOLO / BOTS)</span>
+            </button>
+            <button id="menu-online-btn" type="button" class="xag-btn-online">
+              <span style="font-size: 20px;">⚡</span>
+              <span>MULTIPLAYER LOBBY (PLAY ONLINE)</span>
+            </button>
+          </section>
 
-        <!-- Mobile Sticky Deploy Bar -->
-        <div class="xag-mobile-deploy-bar">
-          <button type="button" id="menu-deploy-btn-mobile" class="xag-deploy-btn">
-            <div class="xag-deploy-decor">◢█████████████████████◣</div>
-            <div>█  DEPLOY SOLO █</div>
-            <div class="xag-deploy-decor">◥█████████████████████◤</div>
-          </button>
-          <button type="button" id="menu-online-btn-mobile" class="xag-online-btn" style="padding: 8px 10px; font-size: 11px;">
-            <span class="xag-pulse-indicator"></span>
-            <span>⚡ MULTIPLAYER</span>
-          </button>
-        </div>
+          <!-- 4. Loadout Dock -->
+          <section>
+            <div class="xag-section-title">
+              <span>🎯 OPERATIVE LOADOUT</span>
+            </div>
+            <div class="xag-loadout-dock">
+              <!-- Primary Weapon -->
+              <div id="weapon-select-card" class="xag-loadout-item" title="Click to swap weapon">
+                <div>
+                  <div style="font-size: 9px; color: #94a3b8; font-weight: 700;">PRIMARY WEAPON</div>
+                  <div id="weapon-name-display" style="font-size: 12px; font-weight: 800; color: #ffffff;">${currentWeaponDef.name}</div>
+                </div>
+                <span id="btn-cycle-weapon" class="xag-swap-badge">SWAP</span>
+              </div>
+
+              <!-- Secondary Weapon -->
+              <div id="sec-weapon-select-card" class="xag-loadout-item" title="Click to swap secondary">
+                <div>
+                  <div style="font-size: 9px; color: #94a3b8; font-weight: 700;">SECONDARY WEAPON</div>
+                  <div id="sec-weapon-name-display" style="font-size: 12px; font-weight: 800; color: #ffffff;">${currentSecWeaponDef.name}</div>
+                </div>
+                <span id="btn-cycle-sec-weapon" class="xag-swap-badge">SWAP</span>
+              </div>
+
+              <!-- Mobility Rig Selector -->
+              <div class="xag-rig-selector">
+                <div class="xag-rig-pill ${this.selectedRig === MovementRigType.PHASE_DASH ? 'active' : ''}" data-rig="${MovementRigType.PHASE_DASH}" title="Specter: Phase Dash through thin cover">
+                  <div style="font-size: 14px;">⚡</div>
+                  <div class="xag-rig-pill-name">SPECTER</div>
+                </div>
+                <div class="xag-rig-pill ${this.selectedRig === MovementRigType.BREACH_BOOSTER ? 'active' : ''}" data-rig="${MovementRigType.BREACH_BOOSTER}" title="Vanguard: Smashes mud/concrete walls">
+                  <div style="font-size: 14px;">🛡️</div>
+                  <div class="xag-rig-pill-name">VANGUARD</div>
+                </div>
+                <div class="xag-rig-pill ${this.selectedRig === MovementRigType.GLITCH_ANCHOR ? 'active' : ''}" data-rig="${MovementRigType.GLITCH_ANCHOR}" title="Chronos: Snap-back teleport beacon">
+                  <div style="font-size: 14px;">⏱️</div>
+                  <div class="xag-rig-pill-name">CHRONOS</div>
+                </div>
+                <div class="xag-rig-pill ${this.selectedRig === MovementRigType.OVERDRIVE_SLIDE ? 'active' : ''}" data-rig="${MovementRigType.OVERDRIVE_SLIDE}" title="Striker: Kinetic slide and wall kick">
+                  <div style="font-size: 14px;">🚀</div>
+                  <div class="xag-rig-pill-name">STRIKER</div>
+                </div>
+              </div>
+
+              <!-- Armory & Vault -->
+              <button id="btn-open-dossier" type="button" class="xag-armory-btn">
+                <span>🛒 ARMORY & SHOP</span>
+              </button>
+            </div>
+          </section>
+
+        </main>
       </div>
     `;
 
-    // 0. Hook Mobile Segmented Tabs
-    const tabButtons = this.container.querySelectorAll<HTMLButtonElement>('.xag-tab-btn');
-    const colDossier = document.getElementById('col-dossier');
-    const colTheater = document.getElementById('col-theater');
-    const colRigs = document.getElementById('col-rigs');
+    // 1. Hook Mode Cards
+    const modeCards = this.container.querySelectorAll<HTMLElement>('.xag-mode-card');
+    modeCards.forEach((card) => {
+      card.addEventListener('click', () => {
+        modeCards.forEach((c) => {
+          c.classList.remove('active');
+          const status = c.querySelector('.xag-mode-status span');
+          if (status) status.textContent = '○ CLICK TO SELECT';
+        });
 
-    tabButtons.forEach((tab) => {
-      const switchTab = () => {
-        tabButtons.forEach((b) => b.classList.remove('active'));
-        tab.classList.add('active');
-        const tabKey = tab.getAttribute('data-tab');
+        card.classList.add('active');
+        const activeStatus = card.querySelector('.xag-mode-status span');
+        if (activeStatus) activeStatus.textContent = '✓ SELECTED';
 
-        if (colDossier) colDossier.classList.toggle('mobile-active', tabKey === '01');
-        if (colTheater) colTheater.classList.toggle('mobile-active', tabKey === '02');
-        if (colRigs) colRigs.classList.toggle('mobile-active', tabKey === '03');
+        this.selectedMode = card.getAttribute('data-mode') as GameModeType;
+        const ts = card.getAttribute('data-teamsize');
+        this.teamSize = ts ? parseInt(ts, 10) : 3;
 
         this.audio?.playUISelect();
-      };
-      tab.addEventListener('click', switchTab);
-      tab.addEventListener('pointerdown', switchTab);
+      });
     });
 
-    // 1. Hook Callsign
+    // 2. Hook Bot Toggle
+    const botBtn = document.getElementById('btn-toggle-bots');
+    const botText = document.getElementById('bot-toggle-text');
+    if (botBtn) {
+      botBtn.addEventListener('click', () => {
+        this.fillBots = !this.fillBots;
+        botBtn.classList.toggle('active', this.fillBots);
+        if (botText) {
+          botText.textContent = this.fillBots ? '✓ BOTS: ON' : '✕ BOTS: OFF';
+        }
+        this.audio?.playUISelect();
+      });
+    }
+
+    // 3. Hook Map Pills
+    const mapPills = this.container.querySelectorAll<HTMLButtonElement>('.xag-map-pill');
+    mapPills.forEach((pill) => {
+      pill.addEventListener('click', () => {
+        mapPills.forEach((p) => p.classList.remove('active'));
+        pill.classList.add('active');
+        this.selectedMap = pill.getAttribute('data-map') as MapId;
+        this.audio?.playUISelect();
+      });
+    });
+
+    // 4. Hook Rig Pills
+    const rigPills = this.container.querySelectorAll<HTMLElement>('.xag-rig-pill');
+    rigPills.forEach((pill) => {
+      pill.addEventListener('click', () => {
+        rigPills.forEach((p) => p.classList.remove('active'));
+        pill.classList.add('active');
+        this.selectedRig = pill.getAttribute('data-rig') as MovementRigType;
+        this.audio?.playUISelect();
+      });
+    });
+
+    // 5. Hook Callsign Input
     const callsignInput = document.getElementById('xag-callsign-input') as HTMLInputElement;
-    const editBtn = document.getElementById('btn-edit-callsign');
     if (callsignInput) {
       callsignInput.addEventListener('input', () => {
-        this.selectedGamerTag = callsignInput.value || 'XAG_001';
+        this.selectedGamerTag = callsignInput.value.trim() || 'XAG_001';
       });
       callsignInput.addEventListener('change', () => {
         const p = OperativeService.getInstance().getProfile();
@@ -1173,42 +822,13 @@ export class MenuOverlay {
         OperativeService.getInstance()['saveToStorage']?.(p);
       });
     }
-    if (editBtn && callsignInput) {
-      editBtn.addEventListener('click', () => {
-        callsignInput.focus();
-        callsignInput.select();
-        this.audio?.playUISelect();
-      });
-    }
 
-    // 2. Hook Weapon Primary Switcher
+    // 6. Hook Weapons
     const updateWeaponDisplay = () => {
       const def = WEAPON_REGISTRY[this.selectedWeapon] || WEAPON_REGISTRY[WeaponId.RIFLE_XAG47];
       const nameEl = document.getElementById('weapon-name-display');
-      const catEl = document.getElementById('weapon-cat-label');
-      const descEl = document.getElementById('weapon-desc-display');
-      const dmgVal = document.getElementById('stat-dmg-val');
-      const dmgBar = document.getElementById('stat-dmg-bar');
-      const rofVal = document.getElementById('stat-rof-val');
-      const rofBar = document.getElementById('stat-rof-bar');
-      const rngVal = document.getElementById('stat-rng-val');
-      const rngBar = document.getElementById('stat-rng-bar');
-      const magVal = document.getElementById('stat-mag-val');
-      const magBar = document.getElementById('stat-mag-bar');
-
-      if (nameEl) nameEl.innerText = def.name.toUpperCase();
-      if (catEl) catEl.innerText = def.category.toUpperCase();
-      if (descEl) descEl.innerText = def.description;
-      if (dmgVal) dmgVal.innerText = `${def.damage}`;
-      if (dmgBar) dmgBar.style.width = `${Math.min(100, (def.damage / 180) * 100)}%`;
-      if (rofVal) rofVal.innerText = `${Math.round(60 / def.fireInterval)}`;
-      if (rofBar) rofBar.style.width = `${Math.min(100, (0.4 / Math.max(0.06, def.fireInterval)) * 100)}%`;
-      if (rngVal) rngVal.innerText = `${def.range}m`;
-      if (rngBar) rngBar.style.width = `${Math.min(100, (def.range / 45) * 100)}%`;
-      if (magVal) magVal.innerText = `${def.magSize}`;
-      if (magBar) magBar.style.width = `${Math.min(100, (def.magSize / 120) * 100)}%`;
+      if (nameEl) nameEl.innerText = def.name;
     };
-
     const cycleWeapon = (e: Event) => {
       e.stopPropagation();
       const idx = WEAPON_CYCLE.indexOf(this.selectedWeapon);
@@ -1217,40 +837,14 @@ export class MenuOverlay {
       updateWeaponDisplay();
       this.audio?.playUISelect();
     };
+    document.getElementById('weapon-select-card')?.addEventListener('click', cycleWeapon);
+    document.getElementById('btn-cycle-weapon')?.addEventListener('click', cycleWeapon);
 
-    const weaponCard = document.getElementById('weapon-select-card');
-    const cycleBtn = document.getElementById('btn-cycle-weapon');
-    if (weaponCard) weaponCard.addEventListener('click', cycleWeapon);
-    if (cycleBtn) cycleBtn.addEventListener('click', cycleWeapon);
-
-    // 2b. Hook Weapon Secondary Switcher
     const updateSecWeaponDisplay = () => {
       const def = WEAPON_REGISTRY[this.selectedSecondaryWeapon] || WEAPON_REGISTRY[WeaponId.SHOTGUN_AA12];
       const nameEl = document.getElementById('sec-weapon-name-display');
-      const catEl = document.getElementById('sec-weapon-cat-label');
-      const descEl = document.getElementById('sec-weapon-desc-display');
-      const dmgVal = document.getElementById('sec-stat-dmg-val');
-      const dmgBar = document.getElementById('sec-stat-dmg-bar');
-      const rofVal = document.getElementById('sec-stat-rof-val');
-      const rofBar = document.getElementById('sec-stat-rof-bar');
-      const rngVal = document.getElementById('sec-stat-rng-val');
-      const rngBar = document.getElementById('sec-stat-rng-bar');
-      const magVal = document.getElementById('sec-stat-mag-val');
-      const magBar = document.getElementById('sec-stat-mag-bar');
-
-      if (nameEl) nameEl.innerText = def.name.toUpperCase();
-      if (catEl) catEl.innerText = def.category.toUpperCase();
-      if (descEl) descEl.innerText = def.description;
-      if (dmgVal) dmgVal.innerText = `${def.damage}`;
-      if (dmgBar) dmgBar.style.width = `${Math.min(100, (def.damage / 180) * 100)}%`;
-      if (rofVal) rofVal.innerText = `${Math.round(60 / def.fireInterval)}`;
-      if (rofBar) rofBar.style.width = `${Math.min(100, (0.4 / Math.max(0.06, def.fireInterval)) * 100)}%`;
-      if (rngVal) rngVal.innerText = `${def.range}m`;
-      if (rngBar) rngBar.style.width = `${Math.min(100, (def.range / 45) * 100)}%`;
-      if (magVal) magVal.innerText = `${def.magSize}`;
-      if (magBar) magBar.style.width = `${Math.min(100, (def.magSize / 120) * 100)}%`;
+      if (nameEl) nameEl.innerText = def.name;
     };
-
     const cycleSecWeapon = (e: Event) => {
       e.stopPropagation();
       const idx = WEAPON_CYCLE.indexOf(this.selectedSecondaryWeapon);
@@ -1259,109 +853,28 @@ export class MenuOverlay {
       updateSecWeaponDisplay();
       this.audio?.playUISelect();
     };
+    document.getElementById('sec-weapon-select-card')?.addEventListener('click', cycleSecWeapon);
+    document.getElementById('btn-cycle-sec-weapon')?.addEventListener('click', cycleSecWeapon);
 
-    const secWeaponCard = document.getElementById('sec-weapon-select-card');
-    const secCycleBtn = document.getElementById('btn-cycle-sec-weapon');
-    if (secWeaponCard) secWeaponCard.addEventListener('click', cycleSecWeapon);
-    if (secCycleBtn) secCycleBtn.addEventListener('click', cycleSecWeapon);
-
-    // 3. Hook Maps
-    const mapCards = this.container.querySelectorAll('.xag-map-card');
-    mapCards.forEach((card) => {
-      const selectMap = (e: Event) => {
-        e.stopPropagation();
-        mapCards.forEach((c) => c.classList.remove('active'));
-        card.classList.add('active');
-        this.selectedMap = card.getAttribute('data-map') as MapId;
-        this.audio?.playUISelect();
-      };
-      card.addEventListener('click', selectMap);
-      card.addEventListener('pointerdown', selectMap);
-      card.addEventListener('mouseenter', () => this.audio?.playUIHover());
-    });
-
-    // 4. Hook Modes
-    const modePills = this.container.querySelectorAll('.xag-mode-pill');
-    modePills.forEach((pill) => {
-      const selectMode = (e: Event) => {
-        e.stopPropagation();
-        modePills.forEach((p) => p.classList.remove('active'));
-        pill.classList.add('active');
-        this.selectedMode = pill.getAttribute('data-mode') as GameModeType;
-        this.audio?.playUISelect();
-      };
-      pill.addEventListener('click', selectMode);
-      pill.addEventListener('pointerdown', selectMode);
-      pill.addEventListener('mouseenter', () => this.audio?.playUIHover());
-    });
-
-    // 5. Hook Rigs
-    const rigCards = this.container.querySelectorAll('.xag-rig-card');
-    rigCards.forEach((card) => {
-      const selectRig = (e: Event) => {
-        e.stopPropagation();
-        rigCards.forEach((c) => {
-          c.classList.remove('active');
-          const tag = c.querySelector('.xag-rig-tag');
-          if (tag) tag.textContent = 'STANDBY';
-        });
-        card.classList.add('active');
-        const activeTag = card.querySelector('.xag-rig-tag');
-        if (activeTag) activeTag.textContent = '[ACTIVE]';
-        this.selectedRig = card.getAttribute('data-rig') as MovementRigType;
-        this.audio?.playUISelect();
-      };
-      card.addEventListener('click', selectRig);
-      card.addEventListener('pointerdown', selectRig);
-      card.addEventListener('mouseenter', () => this.audio?.playUIHover());
-    });
-
-    // 6. Hook Bank & Armory Modals
-    const dossierBtn = document.getElementById('btn-open-dossier');
-    const topVaultBtn = document.getElementById('btn-top-vault');
-    const openDossierHandler = (e: Event) => {
+    // 7. Hook Armory / Shop
+    const openArmory = (e: Event) => {
       e.stopPropagation();
       this.audio?.playCashPickup();
       this.showDossierModal();
     };
-    if (dossierBtn) dossierBtn.addEventListener('click', openDossierHandler);
-    if (topVaultBtn) topVaultBtn.addEventListener('click', openDossierHandler);
+    document.getElementById('btn-open-dossier')?.addEventListener('click', openArmory);
+    document.getElementById('btn-top-vault')?.addEventListener('click', openArmory);
 
-    // 7. Start Animated Canvas Radars in Phosphor Tactical Green
-    this.startRadarAnimation();
-
-    // 8. Deploy Button Handlers (Desktop & Mobile Sticky)
-    const deployBtn = document.getElementById('menu-deploy-btn');
-    const deployBtnMobile = document.getElementById('menu-deploy-btn-mobile');
-    const onlineBtn = document.getElementById('menu-online-btn');
-    const onlineBtnMobile = document.getElementById('menu-online-btn-mobile');
-
-    const handleSoloDeploy = (e: Event) => {
+    // 8. Hook Launch Buttons
+    document.getElementById('menu-deploy-btn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.executeDeploy(false);
-    };
+    });
 
-    if (deployBtn) {
-      deployBtn.addEventListener('click', handleSoloDeploy);
-      deployBtn.addEventListener('pointerdown', handleSoloDeploy);
-    }
-    if (deployBtnMobile) {
-      deployBtnMobile.addEventListener('click', handleSoloDeploy);
-      deployBtnMobile.addEventListener('pointerdown', handleSoloDeploy);
-    }
-
-    if (onlineBtn) {
-      onlineBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.openMultiplayerLobby();
-      });
-    }
-    if (onlineBtnMobile) {
-      onlineBtnMobile.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.openMultiplayerLobby();
-      });
-    }
+    document.getElementById('menu-online-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openMultiplayerLobby();
+    });
   }
 
   private executeDeploy(isMultiplayer = false, roomId?: string): void {
@@ -1402,6 +915,8 @@ export class MenuOverlay {
         secondaryWeapon: this.selectedSecondaryWeapon,
         isMultiplayer,
         roomId,
+        fillBots: this.fillBots,
+        teamSize: this.teamSize,
       });
     }
   }

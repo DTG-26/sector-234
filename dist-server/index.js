@@ -217,11 +217,66 @@ var Room = class {
 };
 
 // server/index.ts
+import fs from "fs";
+import path from "path";
 var PORT = parseInt(process.env.PORT || "8080", 10);
+var DIST_DIR = path.resolve(process.cwd(), "dist");
+var MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".glb": "model/gltf-binary",
+  ".gltf": "model/gltf+json",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".ogg": "audio/ogg",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf"
+};
 var rooms = /* @__PURE__ */ new Map();
 var clientToRoom = /* @__PURE__ */ new Map();
 var clientSockets = /* @__PURE__ */ new Map();
 var server = http.createServer((req, res) => {
+  const reqUrl = req.url?.split("?")[0] || "/";
+  if (reqUrl === "/health" || reqUrl === "/api/status") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      status: "online",
+      game: "XAG: PROTOCOL ZERO",
+      activeRooms: rooms.size,
+      uptimeSeconds: Math.round(process.uptime())
+    }));
+    return;
+  }
+  if (fs.existsSync(DIST_DIR)) {
+    let filePath = path.join(DIST_DIR, reqUrl === "/" ? "index.html" : reqUrl);
+    if (!filePath.startsWith(DIST_DIR)) {
+      res.writeHead(403);
+      res.end("Forbidden");
+      return;
+    }
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+      filePath = path.join(DIST_DIR, "index.html");
+    }
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || "application/octet-stream";
+      const isAsset = reqUrl.startsWith("/assets/");
+      res.writeHead(200, {
+        "Content-Type": contentType,
+        "Cache-Control": isAsset ? "public, max-age=31536000, immutable" : "no-cache"
+      });
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+  }
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({
     status: "online",

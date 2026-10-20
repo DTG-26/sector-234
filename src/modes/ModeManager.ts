@@ -14,10 +14,14 @@ import { ParticleSystem3D } from '../systems/ParticleSystem3D';
 import { WEAPON_REGISTRY } from '../config/constants';
 import { RemotePlayerController } from '../network/RemotePlayerController';
 import { NetworkLobbyPlayer } from '../network/NetworkTypes';
+import { TeamDeathmatchMode } from './TeamDeathmatchMode';
+import { FreeForAllMode } from './FreeForAllMode';
 
 export class ModeManager {
   public currentMode: GameModeType = GameModeType.ODOGWU_STASH;
   public currentMap: MapId = MapId.BIRNIN_KANO;
+  public tdmMode?: TeamDeathmatchMode;
+  public ffaMode?: FreeForAllMode;
   public heistMode?: HeistModeManager;
   public odogwuMode?: OdogwuStashMode;
   public vaultMode?: VaultHeistMode;
@@ -62,6 +66,8 @@ export class ModeManager {
       this.heistMode.destroy(this.scene);
       this.heistMode = undefined;
     }
+    this.tdmMode = undefined;
+    this.ffaMode = undefined;
     if (this.odogwuMode) {
       this.odogwuMode.destroy(this.scene);
       this.odogwuMode = undefined;
@@ -80,21 +86,26 @@ export class ModeManager {
     modeType: GameModeType,
     localPlayerName: string,
     localRig: MovementRigType,
-    mapId: MapId = MapId.BIRNIN_KANO
+    mapId: MapId = MapId.BIRNIN_KANO,
+    fillBots: boolean = true,
+    teamSize: number = 3
   ): Player {
     this.cleanup();
     this.currentMode = modeType;
     this.currentMap = mapId;
     this.isMatchOver = false;
 
-    // Initialize the flagship 3-Act Heist Mode Manager for all Heist operations
-    if (modeType === GameModeType.ODOGWU_STASH || modeType === GameModeType.VAULT_HEIST) {
+    if (modeType === GameModeType.TEAM_DEATHMATCH) {
+      this.tdmMode = new TeamDeathmatchMode(this.scene, teamSize);
+    } else if (modeType === GameModeType.FREE_FOR_ALL) {
+      this.ffaMode = new FreeForAllMode(this.scene, 20);
+    } else if (modeType === GameModeType.ODOGWU_STASH || modeType === GameModeType.VAULT_HEIST) {
       this.heistMode = new HeistModeManager(this.scene, mapId);
     } else {
       this.apapaMode = new ApapaLockdownMode(this.scene);
     }
 
-    // 1. Create Local Player (Spawns safely based on map)
+    // 1. Create Local Player
     const localSpawn = mapId === MapId.LAGOS_GOSLOW ? { x: 16, y: 6.5 } : { x: 14, y: 14.5 };
     const localPlayer = new Player(
       this.scene,
@@ -105,37 +116,61 @@ export class ModeManager {
       true,
       localRig
     );
+    if (modeType === GameModeType.TEAM_DEATHMATCH) {
+      localPlayer.stats.team = 'blue';
+    } else {
+      localPlayer.stats.team = 'none';
+    }
     this.players.push(localPlayer);
 
-    // 2. Populate 5 Autonomous Nigerian Bot Operators with approved Kano/Lagos callsigns
-    const botConfigsKano = [
-      { id: 'bot_sarki', name: 'Sarkin_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.RIFLE_XAG47, x: 26, y: 18.5 },
-      { id: 'bot_arewa', name: 'Arewa_Sniper', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.RAIL_SNIPER, x: 62, y: 34.5 },
-      { id: 'bot_danauta', name: 'Dan_auta_234', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.AKIMBO_UZIS, x: 42, y: 18.5 },
-      { id: 'bot_ghost', name: 'Ghost_Lagos', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.GHOST_SMG, x: 52, y: 26.5 },
-      { id: 'bot_ekoviper', name: 'Eko_Viper', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12, x: 20, y: 24.5 },
-    ];
+    // 2. Populate Autonomous Bots if fillBots is enabled
+    if (fillBots) {
+      const botConfigsKano = [
+        { id: 'bot_sarki', name: 'Sarkin_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.RIFLE_XAG47, x: 26, y: 18.5 },
+        { id: 'bot_arewa', name: 'Arewa_Sniper', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.RAIL_SNIPER, x: 62, y: 34.5 },
+        { id: 'bot_danauta', name: 'Dan_auta_234', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.AKIMBO_UZIS, x: 42, y: 18.5 },
+        { id: 'bot_ghost', name: 'Ghost_Lagos', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.GHOST_SMG, x: 52, y: 26.5 },
+        { id: 'bot_ekoviper', name: 'Eko_Viper', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12, x: 20, y: 24.5 },
+        { id: 'bot_delta', name: 'Delta_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.VULCAN_MINIGUN, x: 34, y: 18.5 },
+        { id: 'bot_zaria', name: 'Zaria_Fox', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.BUNKER_RPG, x: 48, y: 18.5 },
+        { id: 'bot_ibadan', name: 'Ibadan_Heavy', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12, x: 58, y: 26.5 },
+        { id: 'bot_kaduna', name: 'Kaduna_Strike', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.RIFLE_XAG47, x: 18, y: 14.5 },
+      ];
 
-    const botConfigsLagos = [
-      { id: 'bot_sarki', name: 'Sarkin_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.RIFLE_XAG47, x: 24, y: 6.5 },
-      { id: 'bot_arewa', name: 'Arewa_Sniper', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.RAIL_SNIPER, x: 64, y: 28.5 },
-      { id: 'bot_danauta', name: 'Dan_auta_234', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.AKIMBO_UZIS, x: 56, y: 6.5 },
-      { id: 'bot_ghost', name: 'Ghost_Lagos', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.GHOST_SMG, x: 38, y: 22.5 },
-      { id: 'bot_ekoviper', name: 'Eko_Viper', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12, x: 12, y: 24.5 },
-    ];
+      const botConfigsLagos = [
+        { id: 'bot_sarki', name: 'Sarkin_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.RIFLE_XAG47, x: 24, y: 6.5 },
+        { id: 'bot_arewa', name: 'Arewa_Sniper', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.RAIL_SNIPER, x: 64, y: 28.5 },
+        { id: 'bot_danauta', name: 'Dan_auta_234', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.AKIMBO_UZIS, x: 56, y: 6.5 },
+        { id: 'bot_ghost', name: 'Ghost_Lagos', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.GHOST_SMG, x: 38, y: 22.5 },
+        { id: 'bot_ekoviper', name: 'Eko_Viper', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12, x: 12, y: 24.5 },
+        { id: 'bot_delta', name: 'Delta_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.VULCAN_MINIGUN, x: 30, y: 6.5 },
+        { id: 'bot_zaria', name: 'Zaria_Fox', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.BUNKER_RPG, x: 46, y: 22.5 },
+        { id: 'bot_ibadan', name: 'Ibadan_Heavy', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12, x: 68, y: 6.5 },
+        { id: 'bot_kaduna', name: 'Kaduna_Strike', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.RIFLE_XAG47, x: 18, y: 24.5 },
+      ];
 
-    const botConfigs = mapId === MapId.LAGOS_GOSLOW ? botConfigsLagos : botConfigsKano;
+      const botConfigs = mapId === MapId.LAGOS_GOSLOW ? botConfigsLagos : botConfigsKano;
+      const totalDesired = modeType === GameModeType.TEAM_DEATHMATCH ? (teamSize * 2 - 1) : 5;
 
-    botConfigs.forEach((cfg) => {
-      const bot = new Player(this.scene, cfg.id, cfg.name, cfg.x, cfg.y, false, cfg.rig);
-      bot.stats.primaryWeapon = cfg.weapon;
-      bot.stats.activeWeapon = cfg.weapon;
-      bot.mesh.setWeapon(cfg.weapon);
-      this.players.push(bot);
+      for (let i = 0; i < totalDesired; i++) {
+        const cfg = botConfigs[i % botConfigs.length];
+        const bot = new Player(this.scene, `${cfg.id}_${i}`, cfg.name, cfg.x + (i > 4 ? (i - 4) * 2 : 0), cfg.y, false, cfg.rig);
+        bot.stats.primaryWeapon = cfg.weapon;
+        bot.stats.activeWeapon = cfg.weapon;
+        bot.mesh.setWeapon(cfg.weapon);
 
-      const ai = new BotAI(bot);
-      this.bots.push(ai);
-    });
+        if (modeType === GameModeType.TEAM_DEATHMATCH) {
+          // Local player is on Blue (1 member). Need (teamSize - 1) Blue bots, rest Red.
+          bot.stats.team = (i < teamSize - 1) ? 'blue' : 'red';
+        } else {
+          bot.stats.team = 'none';
+        }
+
+        this.players.push(bot);
+        const ai = new BotAI(bot);
+        this.bots.push(ai);
+      }
+    }
 
     // 3. Spawn Initial Map Cash Bundles (₦), Weapon Crates, and Respawning Medkits
     const initialPickups =
@@ -190,14 +225,20 @@ export class ModeManager {
     localRig: MovementRigType,
     mapId: MapId,
     networkPlayers: NetworkLobbyPlayer[],
-    particles: ParticleSystem3D
+    particles: ParticleSystem3D,
+    fillBots: boolean = true,
+    teamSize: number = 3
   ): Player {
     this.cleanup();
     this.currentMode = modeType;
     this.currentMap = mapId;
     this.isMatchOver = false;
 
-    if (modeType === GameModeType.ODOGWU_STASH || modeType === GameModeType.VAULT_HEIST) {
+    if (modeType === GameModeType.TEAM_DEATHMATCH) {
+      this.tdmMode = new TeamDeathmatchMode(this.scene, teamSize);
+    } else if (modeType === GameModeType.FREE_FOR_ALL) {
+      this.ffaMode = new FreeForAllMode(this.scene, 20);
+    } else if (modeType === GameModeType.ODOGWU_STASH || modeType === GameModeType.VAULT_HEIST) {
       this.heistMode = new HeistModeManager(this.scene, mapId);
     } else {
       this.apapaMode = new ApapaLockdownMode(this.scene);
@@ -357,6 +398,12 @@ export class ModeManager {
   }
 
   public handlePlayerElimination(victim: Player, killer?: Player): void {
+    if (this.tdmMode) {
+      this.tdmMode.recordKill(victim, killer);
+    } else if (this.ffaMode) {
+      this.ffaMode.recordKill(victim, killer);
+    }
+
     if (killer && this.heistMode) {
       this.heistMode.handleKill(killer, victim);
     }
@@ -430,7 +477,17 @@ export class ModeManager {
     if (this.isMatchOver) return;
 
     // 1. Update Game Mode State Machine
-    if (this.heistMode) {
+    if (this.tdmMode) {
+      this.tdmMode.update(dt);
+      if (this.tdmMode.isMatchOver) {
+        this.isMatchOver = true;
+      }
+    } else if (this.ffaMode) {
+      this.ffaMode.update(dt, this.players);
+      if (this.ffaMode.isMatchOver) {
+        this.isMatchOver = true;
+      }
+    } else if (this.heistMode) {
       this.heistMode.update(dt, this.players, particles, tileMap);
       if (this.heistMode.currentAct === HeistAct.MATCH_OVER) {
         this.isMatchOver = true;

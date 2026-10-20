@@ -280,6 +280,7 @@ export class Player {
     if (allPlayers) {
       for (const other of allPlayers) {
         if (other.stats.id === this.stats.id || other.stats.isDead) continue;
+        if (this.stats.team && other.stats.team && this.stats.team === other.stats.team) continue;
         const dx = other.actor.position.x - this.actor.position.x;
         const dy = (other.actor.position.y + 0.95) - (this.actor.position.y + 0.95);
         const dist = Math.sqrt(dx * dx + dy * dy);

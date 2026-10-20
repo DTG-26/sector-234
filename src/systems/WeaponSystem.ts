@@ -215,6 +215,10 @@ export class WeaponSystem {
         },
         (target, dmg) => {
           const attacker = players.find((p) => p.stats.id === proj.shooterId);
+          // Friendly fire immunity for Team Deathmatch
+          if (attacker && attacker.stats.team && target.stats.team && attacker.stats.team === target.stats.team) {
+            return;
+          }
           const died = target.takeDamage(dmg, attacker);
           this.particles.spawnSparks(target.actor.position.x, target.actor.position.y + 1.0, -proj.vx, -proj.vy, 10);
           

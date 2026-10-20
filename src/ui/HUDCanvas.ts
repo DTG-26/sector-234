@@ -125,6 +125,10 @@ export class HUDCanvas {
       } else if (mode.heistMode.currentAct === HeistAct.ACT_3_EXTRACTION) {
         modeLabel = mode.heistMode.isExtractionContested ? `⚠️ LZ CONTESTED!` : `ACT III: CHOPPER EVAC`;
       }
+    } else if (mode.tdmMode) {
+      modeLabel = `TEAM DEATHMATCH (TARGET: ${mode.tdmMode.targetScore})`;
+    } else if (mode.ffaMode) {
+      modeLabel = `FREE FOR ALL (FIRST TO ${mode.ffaMode.targetKills})`;
     }
 
     ctx.fillStyle = mode.heistMode?.isExtractionContested ? '#ef4444' : '#f59e0b';
@@ -132,10 +136,35 @@ export class HUDCanvas {
     ctx.textAlign = 'center';
     ctx.fillText(modeLabel, w * 0.5, isMobile ? 15 : 17);
 
-    ctx.fillStyle = timeRemaining <= 30 ? '#ef4444' : '#f8fafc';
-    ctx.font = `800 ${isMobile ? 14 : 16}px "JetBrains Mono", monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText(timeStr, w * 0.5, isMobile ? 29 : 32);
+    if (mode.tdmMode) {
+      // Duel team score display: BLUE vs RED
+      const bScore = mode.tdmMode.blueScore;
+      const rScore = mode.tdmMode.redScore;
+      ctx.font = `900 ${isMobile ? 13 : 15}px "JetBrains Mono", monospace`;
+      ctx.textAlign = 'center';
+
+      // Blue score
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(`BLUE: ${bScore}`, w * 0.5 - 45, isMobile ? 29 : 32);
+
+      // Dash
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(`-`, w * 0.5, isMobile ? 29 : 32);
+
+      // Red score
+      ctx.fillStyle = '#f87171';
+      ctx.fillText(`RED: ${rScore}`, w * 0.5 + 45, isMobile ? 29 : 32);
+    } else if (mode.ffaMode) {
+      ctx.fillStyle = timeRemaining <= 30 ? '#ef4444' : '#f8fafc';
+      ctx.font = `800 ${isMobile ? 13 : 15}px "JetBrains Mono", monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${timeStr}  •  KILLS: ${player.stats.kills}/${mode.ffaMode.targetKills}`, w * 0.5, isMobile ? 29 : 32);
+    } else {
+      ctx.fillStyle = timeRemaining <= 30 ? '#ef4444' : '#f8fafc';
+      ctx.font = `800 ${isMobile ? 14 : 16}px "JetBrains Mono", monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(timeStr, w * 0.5, isMobile ? 29 : 32);
+    }
 
     // Kills / Deaths
     ctx.fillStyle = '#cbd5e1';

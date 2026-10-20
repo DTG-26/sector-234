@@ -115,6 +115,9 @@ export class Throwable3D {
       players.forEach((p) => {
         const dist = p.actor.position.distanceTo(this.mesh.position);
         if (dist < 10.0) {
+          if (attacker?.stats.team && p.stats.team && attacker.stats.team === p.stats.team) {
+            return;
+          }
           const dmg = Math.round(240 * (1 - dist / 10.0));
           const died = p.takeDamage(dmg, attacker);
           if (died && onPlayerKilled) {

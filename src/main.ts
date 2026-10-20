@@ -154,6 +154,9 @@ const startMatch = (opts: MenuStartOptions) => {
     MapGenerator.generateBirninKano(tileMap);
   }
 
+  const fillBots = opts.fillBots !== undefined ? opts.fillBots : true;
+  const teamSize = opts.teamSize || 3;
+
   if (opts.isMultiplayer && net.isConnected && net.cachedLobbyPlayers.length > 0) {
     localPlayer = modeManager.initMultiplayerMatch(
       opts.modeType,
@@ -162,10 +165,19 @@ const startMatch = (opts: MenuStartOptions) => {
       opts.rigType,
       opts.mapId,
       net.cachedLobbyPlayers,
-      particles
+      particles,
+      fillBots,
+      teamSize
     );
   } else {
-    localPlayer = modeManager.initMatch(opts.modeType, opts.gamerTag, opts.rigType, opts.mapId);
+    localPlayer = modeManager.initMatch(
+      opts.modeType,
+      opts.gamerTag,
+      opts.rigType,
+      opts.mapId,
+      fillBots,
+      teamSize
+    );
   }
   if (localPlayer) {
     if (opts.primaryWeapon) {
