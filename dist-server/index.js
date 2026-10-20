@@ -219,8 +219,15 @@ var Room = class {
 // server/index.ts
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = path.dirname(__filename);
 var PORT = parseInt(process.env.PORT || "8080", 10);
 var DIST_DIR = path.resolve(process.cwd(), "dist");
+if (!fs.existsSync(DIST_DIR)) {
+  DIST_DIR = path.resolve(__dirname, "../dist");
+}
+console.log(`[HTTP] Serving static web app from: ${DIST_DIR} (exists: ${fs.existsSync(DIST_DIR)})`);
 var MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",

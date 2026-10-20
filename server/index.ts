@@ -9,9 +9,17 @@ import { NetMessageType } from '../src/network/NetworkTypes.ts';
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
-const DIST_DIR = path.resolve(process.cwd(), 'dist');
+let DIST_DIR = path.resolve(process.cwd(), 'dist');
+if (!fs.existsSync(DIST_DIR)) {
+  DIST_DIR = path.resolve(__dirname, '../dist');
+}
+console.log(`[HTTP] Serving static web app from: ${DIST_DIR} (exists: ${fs.existsSync(DIST_DIR)})`);
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
