@@ -56,18 +56,6 @@ weaponSystem.onDamageDealt = (x, y, text, color) => {
   hud.addDamagePopup(x, y, text, color);
 };
 
-// Connect Switchable Camera Zoom (1x / 2x / 3x)
-input.onCycleZoom = () => {
-  engine.cameraSystem.cycleZoom();
-  const label = engine.cameraSystem.getZoomLabel();
-  const btnCam = document.getElementById('btn-touch-cam');
-  if (btnCam) btnCam.innerText = label;
-  audio.playCashPickup();
-  if (localPlayer) {
-    hud.addDamagePopup(localPlayer.actor.position.x, localPlayer.actor.position.y + 2.2, label, '#38bdf8', 20);
-  }
-};
-
 let localPlayer: Player | null = null;
 let currentRig: MovementRigType = MovementRigType.BREACH_BOOSTER;
 let currentMode: GameModeType = GameModeType.ODOGWU_STASH;

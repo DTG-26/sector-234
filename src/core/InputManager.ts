@@ -35,7 +35,6 @@ export class InputManager {
   // Holding buttons
   public isHoldingFlyButton: boolean = false;
   public isHoldingFireButton: boolean = false;
-  public onCycleZoom?: () => void;
 
   // Compatibility getters for HUDCanvas
   public get isLeftActive(): boolean { return this.mmController.leftStick.active; }
@@ -71,9 +70,6 @@ export class InputManager {
       if (e.code === 'ShiftLeft') this.state.rig = true;
       if ((e.code === 'KeyS' || e.code === 'ArrowDown') && !e.repeat) {
         this.state.groundSlam = false;
-      }
-      if (e.code === 'KeyZ') {
-        if (this.onCycleZoom) this.onCycleZoom();
       }
 
       if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) {
@@ -225,14 +221,6 @@ export class InputManager {
     bindBtn('btn-touch-reload', () => {
       this.state.reload = true;
       this.triggerHaptic(20);
-    });
-
-    // [🔍 CAMERA ZOOM] Button (1x / 2x / 3x)
-    bindBtn('btn-touch-cam', () => {
-      if (this.onCycleZoom) {
-        this.onCycleZoom();
-        this.triggerHaptic(25);
-      }
     });
 
     // [⛶ FULLSCREEN] Button

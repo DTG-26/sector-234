@@ -2,12 +2,6 @@ import * as THREE from 'three';
 import { ARENA_CONFIG } from '../config/constants';
 import { WeaponId } from '../config/types';
 
-export enum CameraZoomMode {
-  AUTO = 0,    // Dynamic Weapon-Driven Zoom (Berserker / CQB / Tactical / Heavy / Sniper)
-  CLOSE = 1,   // Manual Close 1x
-  WIDE = 2,    // Manual Wide 3x
-}
-
 export class Camera3D {
   public camera: THREE.PerspectiveCamera;
   public targetPosition: THREE.Vector3 = new THREE.Vector3(40, 25, 0);
@@ -18,7 +12,7 @@ export class Camera3D {
   public targetSpeedZoom: number = 0;
   public isMobile: boolean = false;
   
-  // Weapon Profile Parameters
+  // Weapon Profile Parameters (Strictly Weapon-Driven Zoom)
   public activeWeapon: WeaponId = WeaponId.RIFLE_XAG47;
   public weaponTargetZ: number = 18.0;
   public weaponAimLead: number = 4.5;
@@ -27,9 +21,6 @@ export class Camera3D {
   // Tactical Rig Overrides
   public breachPullbackTimer: number = 0;
   public isSlideActive: boolean = false;
-
-  // Switchable Zoom Level (Default to AUTO for weapon-driven playstyles)
-  public zoomMode: CameraZoomMode = CameraZoomMode.AUTO;
 
   // Trauma-based 3D screen shake
   private trauma: number = 0;
@@ -129,26 +120,7 @@ export class Camera3D {
   }
 
   public getBaseZ(): number {
-    if (this.zoomMode === CameraZoomMode.AUTO) {
-      return this.weaponTargetZ;
-    } else if (this.zoomMode === CameraZoomMode.CLOSE) {
-      return this.isMobile ? 13.0 : 15.0;
-    } else {
-      return this.isMobile ? 22.0 : 26.0;
-    }
-  }
-
-  public cycleZoom(): CameraZoomMode {
-    this.zoomMode = (this.zoomMode + 1) % 3;
-    return this.zoomMode;
-  }
-
-  public getZoomLabel(): string {
-    switch (this.zoomMode) {
-      case CameraZoomMode.AUTO: return '🔍 DYN';
-      case CameraZoomMode.CLOSE: return '🔍 1x';
-      case CameraZoomMode.WIDE: return '🔍 3x';
-    }
+    return this.weaponTargetZ;
   }
 
   public onResize(aspect: number): void {
