@@ -32,6 +32,8 @@ export enum WeaponId {
 }
 
 export enum GameModeType {
+  TEAM_DEATHMATCH = 'TEAM_DEATHMATCH',
+  FREE_FOR_ALL = 'FREE_FOR_ALL',
   ODOGWU_STASH = 'ODOGWU_STASH',
   VAULT_HEIST = 'VAULT_HEIST',
   APAPA_LOCKDOWN = 'APAPA_LOCKDOWN',
@@ -61,6 +63,7 @@ export interface PlayerStats {
   name: string;
   isBot: boolean;
   isLocalPlayer: boolean;
+  team?: 'blue' | 'red' | 'none';
   hp: number;
   maxHp: number;
   armor: number;

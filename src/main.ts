@@ -15,6 +15,7 @@ import { HUDCanvas } from './ui/HUDCanvas';
 import { MenuOverlay, MenuStartOptions } from './ui/MenuOverlay';
 import { GameModeType, HeistAct, MapId, MovementRigType, WeaponId } from './config/types';
 import { Player } from './entities/Player';
+import { NetworkClient } from './network/NetworkClient';
 
 console.log('[STUDIO XAG: PROTOCOL ZERO] Initializing Tactical Arena Engine...');
 
@@ -60,6 +61,81 @@ let localPlayer: Player | null = null;
 let currentRig: MovementRigType = MovementRigType.BREACH_BOOSTER;
 let currentMode: GameModeType = GameModeType.ODOGWU_STASH;
 let isGameActive = false;
+let lastNetTick = 0;
+
+// 3.5. Initialize Network Client & Callbacks
+const net = NetworkClient.getInstance();
+
+net.onSnapshot = (snapshot) => {
+  if (!isGameActive || !localPlayer) return;
+  for (const pState of snapshot.players) {
+    if (pState.id === localPlayer.stats.id) continue;
+    const controller = modeManager.remoteControllers.get(pState.id);
+    if (controller) {
+      controller.applySnapshot(pState);
+    }
+  }
+};
+
+net.onFireWeapon = (fire) => {
+  if (!isGameActive || !localPlayer || fire.playerId === localPlayer.stats.id) return;
+  const remoteP = modeManager.players.find((p) => p.stats.id === fire.playerId);
+  if (remoteP) {
+    weaponSystem.fireWeapon(
+      remoteP,
+      fire.aimAngle,
+      modeManager.players,
+      (victim, killer) => modeManager.handlePlayerElimination(victim, killer),
+      tileMap
+    );
+  }
+};
+
+net.onRigTrigger = (rigData) => {
+  if (!isGameActive || !localPlayer || rigData.playerId === localPlayer.stats.id) return;
+  const remoteP = modeManager.players.find((p) => p.stats.id === rigData.playerId);
+  if (remoteP) {
+    audio.playThrusterWhoosh();
+    hud.addDamagePopup(
+      remoteP.actor.position.x,
+      remoteP.actor.position.y + 1.8,
+      rigData.popupText,
+      '#06b6d4',
+      22
+    );
+  }
+};
+
+net.onGroundSlam = (slam) => {
+  if (!isGameActive || !localPlayer || slam.playerId === localPlayer.stats.id) return;
+  audio.playThrusterWhoosh();
+  particles.spawnSparks(slam.x, slam.y, 0, 4, 18);
+};
+
+net.onDamageEvent = (dmg) => {
+  if (!isGameActive) return;
+  const target = modeManager.players.find((p) => p.stats.id === dmg.targetId);
+  if (target) {
+    target.stats.hp = dmg.newHp;
+    hud.addDamagePopup(dmg.x, dmg.y, `-${dmg.damage}`, dmg.isHeadshot ? '#f59e0b' : '#ef4444');
+  }
+};
+
+net.onTileDestroy = (tile) => {
+  tileMap.damageTile(tile.tileX, tile.tileY, 999);
+  particles.spawnSparks(tile.tileX + 0.5, tile.tileY + 0.5, 0, 3, 8);
+};
+
+net.onPlayerLeft = (leftId) => {
+  const idx = modeManager.players.findIndex((p) => p.stats.id === leftId);
+  if (idx !== -1) {
+    const p = modeManager.players[idx];
+    hud.addDamagePopup(p.actor.position.x, p.actor.position.y + 1.5, `${p.stats.name} LEFT MATCH`, '#ef4444', 16);
+    p.destroy();
+    modeManager.players.splice(idx, 1);
+    modeManager.remoteControllers.delete(leftId);
+  }
+};
 
 // 4. Start Match Routine
 const startMatch = (opts: MenuStartOptions) => {
@@ -78,7 +154,19 @@ const startMatch = (opts: MenuStartOptions) => {
     MapGenerator.generateBirninKano(tileMap);
   }
 
-  localPlayer = modeManager.initMatch(opts.modeType, opts.gamerTag, opts.rigType, opts.mapId);
+  if (opts.isMultiplayer && net.isConnected && net.cachedLobbyPlayers.length > 0) {
+    localPlayer = modeManager.initMultiplayerMatch(
+      opts.modeType,
+      net.localPlayerId || 'player_local',
+      opts.gamerTag,
+      opts.rigType,
+      opts.mapId,
+      net.cachedLobbyPlayers,
+      particles
+    );
+  } else {
+    localPlayer = modeManager.initMatch(opts.modeType, opts.gamerTag, opts.rigType, opts.mapId);
+  }
   if (localPlayer) {
     if (opts.primaryWeapon) {
       localPlayer.stats.primaryWeapon = opts.primaryWeapon;
@@ -139,6 +227,13 @@ engine.onUpdate((dt: number) => {
     if (input.state.groundSlam) {
       const slammed = rigSystem.triggerGroundSlam(localPlayer.actor, localPlayer.mesh, tileMap);
       if (slammed) {
+        if (net.isConnected && net.currentRoomId) {
+          net.sendGroundSlam({
+            playerId: localPlayer.stats.id,
+            x: localPlayer.actor.position.x,
+            y: localPlayer.actor.position.y,
+          });
+        }
         engine.cameraSystem.addTrauma(0.2);
         audio.playThrusterWhoosh();
       }
@@ -154,6 +249,14 @@ engine.onUpdate((dt: number) => {
         engine.cameraSystem
       );
       if (res.activated) {
+        if (net.isConnected && net.currentRoomId) {
+          net.sendRigTrigger({
+            playerId: localPlayer.stats.id,
+            rigType: localPlayer.stats.rigType,
+            angle: effectiveAimAngle,
+            popupText: res.popupText,
+          });
+        }
         audio.playThrusterWhoosh();
         engine.cameraSystem.addTrauma(0.35);
         hud.addDamagePopup(
@@ -252,6 +355,15 @@ engine.onUpdate((dt: number) => {
         tileMap
       );
       if (fired) {
+        if (net.isConnected && net.currentRoomId) {
+          net.sendFire({
+            playerId: localPlayer.stats.id,
+            weaponId: localPlayer.stats.activeWeapon,
+            originX: localPlayer.actor.position.x,
+            originY: localPlayer.actor.position.y + 0.95,
+            aimAngle: effectiveAimAngle,
+          });
+        }
         const weaponId = localPlayer.stats.activeWeapon;
         if (weaponId === WeaponId.SHOTGUN_AA12 || weaponId === WeaponId.RAIL_SNIPER) {
           engine.cameraSystem.addTrauma(0.03);
@@ -287,6 +399,32 @@ engine.onUpdate((dt: number) => {
 
   // Update Local Player
   localPlayer.update(dt, tileMap, rigSystem, effectiveAimAngle);
+
+  // Send 30Hz Client Tick in Online Matches
+  if (net.isConnected && net.currentRoomId) {
+    const now = performance.now();
+    if (now - lastNetTick >= 33) {
+      lastNetTick = now;
+      net.sendTick({
+        id: localPlayer.stats.id,
+        x: localPlayer.actor.position.x,
+        y: localPlayer.actor.position.y,
+        vx: localPlayer.actor.velocity.x,
+        vy: localPlayer.actor.velocity.y,
+        aimAngle: effectiveAimAngle,
+        facingRight: Math.cos(effectiveAimAngle) >= 0,
+        isJetFlying: localPlayer.isJetFlying,
+        isGrounded: localPlayer.actor.isGrounded,
+        isSliding: localPlayer.isSliding,
+        hp: localPlayer.stats.hp,
+        armor: localPlayer.stats.armor,
+        fuel: localPlayer.jetFuel,
+        activeWeapon: localPlayer.stats.activeWeapon,
+        isDead: localPlayer.stats.isDead,
+        timestamp: Date.now(),
+      });
+    }
+  }
 
   // Update Weapons & Projectiles
   weaponSystem.update(dt, tileMap, modeManager.players, (victim, killer) => {

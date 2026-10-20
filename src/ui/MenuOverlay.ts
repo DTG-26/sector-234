@@ -3,6 +3,8 @@ import { RoastReceipt } from './RoastReceipt';
 import { OperativeService } from '../services/OperativeService';
 import { WEAPON_REGISTRY } from '../config/constants';
 import { AudioSynth } from '../core/AudioSynth';
+import { NetworkClient } from '../network/NetworkClient';
+import { NetworkLobbyPlayer, RoomStatePayload } from '../network/NetworkTypes';
 
 export interface MenuStartOptions {
   gamerTag: string;
@@ -11,6 +13,8 @@ export interface MenuStartOptions {
   mapId: MapId;
   primaryWeapon?: WeaponId;
   secondaryWeapon?: WeaponId;
+  isMultiplayer?: boolean;
+  roomId?: string;
 }
 
 const WEAPON_CYCLE: WeaponId[] = [
@@ -589,6 +593,43 @@ export class MenuOverlay {
           font-weight: 800;
         }
 
+        .xag-online-btn {
+          width: 100%;
+          margin-top: 8px;
+          background: linear-gradient(135deg, rgba(6, 182, 212, 0.22) 0%, rgba(14, 116, 144, 0.38) 100%);
+          border: 1px solid #06b6d4;
+          color: #38bdf8;
+          font-family: 'Chakra Petch', 'JetBrains Mono', sans-serif;
+          font-size: 13px;
+          font-weight: 800;
+          letter-spacing: 2px;
+          padding: 11px 12px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          transition: all 0.2s ease;
+          clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+          box-shadow: 0 0 12px rgba(6, 182, 212, 0.2);
+        }
+        .xag-online-btn:hover {
+          background: linear-gradient(135deg, rgba(6, 182, 212, 0.45) 0%, rgba(14, 116, 144, 0.65) 100%);
+          filter: drop-shadow(0 0 14px rgba(6, 182, 212, 0.7));
+          transform: scale(1.02);
+        }
+        .xag-online-btn:active {
+          transform: scale(0.98);
+        }
+        .xag-pulse-indicator {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #06b6d4;
+          box-shadow: 0 0 8px #06b6d4;
+          animation: pulseMilitaryLed 1.5s infinite;
+        }
+
         /* Mobile Segmented Control Bar */
         .xag-mobile-tabs {
           display: none;
@@ -1069,8 +1110,12 @@ export class MenuOverlay {
             <div class="xag-deploy-container">
               <button id="menu-deploy-btn" class="xag-deploy-btn">
                 <div class="xag-deploy-decor">◢█████████████████████◣</div>
-                <div>█  DEPLOY TO SECTOR 234 █</div>
+                <div>█  DEPLOY SOLO (BOTS) █</div>
                 <div class="xag-deploy-decor">◥█████████████████████◤</div>
+              </button>
+              <button id="menu-online-btn" class="xag-online-btn" type="button">
+                <span class="xag-pulse-indicator"></span>
+                <span>⚡ MULTIPLAYER ARENA (ONLINE LOBBY)</span>
               </button>
             </div>
 
@@ -1082,8 +1127,12 @@ export class MenuOverlay {
         <div class="xag-mobile-deploy-bar">
           <button type="button" id="menu-deploy-btn-mobile" class="xag-deploy-btn">
             <div class="xag-deploy-decor">◢█████████████████████◣</div>
-            <div>█  DEPLOY TO SECTOR 234 █</div>
+            <div>█  DEPLOY SOLO █</div>
             <div class="xag-deploy-decor">◥█████████████████████◤</div>
+          </button>
+          <button type="button" id="menu-online-btn-mobile" class="xag-online-btn" style="padding: 8px 10px; font-size: 11px;">
+            <span class="xag-pulse-indicator"></span>
+            <span>⚡ MULTIPLAYER</span>
           </button>
         </div>
       </div>
@@ -1284,59 +1333,289 @@ export class MenuOverlay {
     // 8. Deploy Button Handlers (Desktop & Mobile Sticky)
     const deployBtn = document.getElementById('menu-deploy-btn');
     const deployBtnMobile = document.getElementById('menu-deploy-btn-mobile');
-    let deployed = false;
-    const handleDeploy = (e: Event) => {
+    const onlineBtn = document.getElementById('menu-online-btn');
+    const onlineBtnMobile = document.getElementById('menu-online-btn-mobile');
+
+    const handleSoloDeploy = (e: Event) => {
       e.stopPropagation();
-      if (deployed) return;
-      deployed = true;
+      this.executeDeploy(false);
+    };
 
-      this.audio?.playUIDeploy();
+    if (deployBtn) {
+      deployBtn.addEventListener('click', handleSoloDeploy);
+      deployBtn.addEventListener('pointerdown', handleSoloDeploy);
+    }
+    if (deployBtnMobile) {
+      deployBtnMobile.addEventListener('click', handleSoloDeploy);
+      deployBtnMobile.addEventListener('pointerdown', handleSoloDeploy);
+    }
 
-      // Stop radar
-      if (this.radarAnimId !== null) {
-        cancelAnimationFrame(this.radarAnimId);
-        this.radarAnimId = null;
+    if (onlineBtn) {
+      onlineBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openMultiplayerLobby();
+      });
+    }
+    if (onlineBtnMobile) {
+      onlineBtnMobile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openMultiplayerLobby();
+      });
+    }
+  }
+
+  private executeDeploy(isMultiplayer = false, roomId?: string): void {
+    this.audio?.playUIDeploy();
+
+    // Stop radar
+    if (this.radarAnimId !== null) {
+      cancelAnimationFrame(this.radarAnimId);
+      this.radarAnimId = null;
+    }
+
+    // Fullscreen attempt on mobile
+    const doc = document as any;
+    const docEl = document.documentElement as any;
+    const isFull = doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement;
+    if (!isFull) {
+      const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+      if (req) req.call(docEl).catch(() => {});
+    }
+    try {
+      if (screen.orientation && (screen.orientation as any).lock) {
+        (screen.orientation as any).lock('landscape').catch(() => {});
       }
+    } catch (_) {}
+    window.scrollTo(0, 1);
 
-      // Fullscreen attempt on mobile
-      const doc = document as any;
-      const docEl = document.documentElement as any;
-      const isFull = doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement;
-      if (!isFull) {
-        const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
-        if (req) req.call(docEl).catch(() => {});
-      }
-      try {
-        if (screen.orientation && (screen.orientation as any).lock) {
-          (screen.orientation as any).lock('landscape').catch(() => {});
-        }
-      } catch (_) {}
-      window.scrollTo(0, 1);
+    this.container.innerHTML = '';
+    const touchControls = document.getElementById('touch-controls');
+    if (touchControls) touchControls.style.display = 'block';
 
-      this.container.innerHTML = '';
-      const touchControls = document.getElementById('touch-controls');
-      if (touchControls) touchControls.style.display = 'block';
+    if (this.onStartGameCallback) {
+      this.onStartGameCallback({
+        gamerTag: this.selectedGamerTag,
+        rigType: this.selectedRig,
+        modeType: this.selectedMode,
+        mapId: this.selectedMap,
+        primaryWeapon: this.selectedWeapon,
+        secondaryWeapon: this.selectedSecondaryWeapon,
+        isMultiplayer,
+        roomId,
+      });
+    }
+  }
 
-      if (this.onStartGameCallback) {
-        this.onStartGameCallback({
-          gamerTag: this.selectedGamerTag,
-          rigType: this.selectedRig,
-          modeType: this.selectedMode,
-          mapId: this.selectedMap,
-          primaryWeapon: this.selectedWeapon,
-          secondaryWeapon: this.selectedSecondaryWeapon,
+  private openMultiplayerLobby(): void {
+    const net = NetworkClient.getInstance();
+
+    const existing = document.getElementById('xag-lobby-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'xag-lobby-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.88);
+      backdrop-filter: blur(8px);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      font-family: 'Chakra Petch', 'JetBrains Mono', monospace;
+      color: #f8fafc;
+    `;
+
+    document.body.appendChild(overlay);
+
+    const renderLobbyContent = (roomState?: RoomStatePayload, errorMsg?: string) => {
+      if (roomState && roomState.roomId) {
+        const isHost = roomState.isHost;
+        const myPlayer = roomState.players.find(p => p.id === roomState.yourPlayerId);
+        const isReady = myPlayer ? myPlayer.isReady : false;
+
+        overlay.innerHTML = `
+          <div style="background: #090d16; border: 1px solid #06b6d4; box-shadow: 0 0 35px rgba(6, 182, 212, 0.35); max-width: 580px; width: 100%; border-radius: 8px; overflow: hidden; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-bottom: 16px;">
+              <div>
+                <div style="font-size: 11px; color: #06b6d4; font-weight: 700; letter-spacing: 2px;">⚡ LIVE TACTICAL ROOM</div>
+                <div style="font-size: 24px; font-weight: 900; letter-spacing: 4px; color: #ffffff;">CODE: <span style="color: #38bdf8; text-shadow: 0 0 10px rgba(56, 189, 248, 0.7);">${roomState.roomId}</span></div>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <button id="lobby-copy-btn" style="background: #1e293b; border: 1px solid #06b6d4; color: #38bdf8; padding: 6px 12px; font-size: 11px; font-weight: 700; cursor: pointer; border-radius: 4px; font-family: inherit;">📋 COPY CODE</button>
+                <div style="font-size: 10px; background: rgba(34, 197, 94, 0.15); border: 1px solid #22c55e; color: #4ade80; padding: 4px 8px; border-radius: 4px;">🟢 ${net.ping || 20}ms</div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; font-size: 11px; color: #94a3b8; margin-bottom: 16px; background: #0f172a; padding: 8px 12px; border-radius: 4px; border: 1px solid #1e293b;">
+              <div>MAP: <span style="color: #ffffff; font-weight: 700;">${this.selectedMap === MapId.LAGOS_GOSLOW ? 'LAGOS GO-SLOW' : 'BIRNIN KANO'}</span></div>
+              <div>MODE: <span style="color: #ffffff; font-weight: 700;">${this.selectedMode}</span></div>
+              <div>OPERATIVES: <span style="color: #38bdf8; font-weight: 700;">${roomState.players.length} / 6</span></div>
+            </div>
+
+            <!-- Player Roster -->
+            <div style="margin-bottom: 20px;">
+              <div style="font-size: 10px; font-weight: 700; color: #64748b; letter-spacing: 2px; margin-bottom: 8px;">CONNECTED OPERATIVES:</div>
+              <div style="display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto;">
+                ${roomState.players.map(p => `
+                  <div style="display: flex; align-items: center; justify-content: space-between; background: ${p.id === roomState.yourPlayerId ? 'rgba(6, 182, 212, 0.12)' : '#0f172a'}; border: 1px solid ${p.id === roomState.yourPlayerId ? '#06b6d4' : '#1e293b'}; padding: 8px 12px; border-radius: 4px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-weight: 800; color: ${p.id === roomState.yourPlayerId ? '#38bdf8' : '#ffffff'}; font-size: 13px;">${p.name} ${p.isHost ? '<span style="color: #eab308; font-size: 10px;">[HOST]</span>' : ''}</span>
+                      <span style="font-size: 10px; background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px;">${p.rig}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 10px; color: ${p.isReady ? '#4ade80' : '#f59e0b'}; font-weight: 800; background: ${p.isReady ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)'}; padding: 3px 8px; border-radius: 3px; border: 1px solid ${p.isReady ? '#22c55e' : '#f59e0b'};">
+                        ${p.isReady ? '✓ READY' : '⏳ PREPARING'}
+                      </span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 10px;">
+              <button id="lobby-ready-btn" style="flex: 1; background: ${isReady ? '#1e293b' : 'linear-gradient(135deg, #0284c7, #0369a1)'}; border: 1px solid #38bdf8; color: #ffffff; padding: 12px; font-weight: 800; font-size: 13px; cursor: pointer; border-radius: 4px; font-family: inherit;">
+                ${isReady ? 'CANCEL READY' : '⚡ READY UP'}
+              </button>
+              ${isHost ? `
+                <button id="lobby-start-btn" style="flex: 2; background: repeating-linear-gradient(-45deg, #008751, #008751 14px, #007345 14px, #007345 28px); border: 1px solid #4ade80; color: #ffffff; padding: 12px; font-weight: 900; font-size: 14px; letter-spacing: 2px; cursor: pointer; border-radius: 4px; font-family: inherit;">
+                  LAUNCH MATCH
+                </button>
+              ` : `
+                <div style="flex: 2; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #94a3b8; background: #0f172a; border: 1px solid #1e293b; border-radius: 4px;">
+                  Waiting for host to launch...
+                </div>
+              `}
+              <button id="lobby-leave-btn" style="background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #f87171; padding: 12px 16px; font-weight: 700; font-size: 12px; cursor: pointer; border-radius: 4px; font-family: inherit;">LEAVE</button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('lobby-copy-btn')?.addEventListener('click', () => {
+          navigator.clipboard.writeText(roomState.roomId).then(() => {
+            const btn = document.getElementById('lobby-copy-btn');
+            if (btn) btn.innerText = 'COPIED!';
+            setTimeout(() => { if (btn) btn.innerText = '📋 COPY CODE'; }, 1500);
+          });
+        });
+
+        document.getElementById('lobby-ready-btn')?.addEventListener('click', () => {
+          net.setReady(!isReady);
+        });
+
+        document.getElementById('lobby-start-btn')?.addEventListener('click', () => {
+          net.startMatch();
+        });
+
+        document.getElementById('lobby-leave-btn')?.addEventListener('click', () => {
+          overlay.remove();
+        });
+
+      } else {
+        // Initial Room Picker (Create or Join)
+        overlay.innerHTML = `
+          <div style="background: #090d16; border: 1px solid #06b6d4; box-shadow: 0 0 35px rgba(6, 182, 212, 0.35); max-width: 480px; width: 100%; border-radius: 8px; overflow: hidden; padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-bottom: 20px;">
+              <div>
+                <div style="font-size: 11px; color: #06b6d4; font-weight: 700; letter-spacing: 2px;">⚡ MULTIPLAYER ARENA</div>
+                <div style="font-size: 20px; font-weight: 900; letter-spacing: 3px; color: #ffffff;">ONLINE LOBBY</div>
+              </div>
+              <button id="lobby-close-btn" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer;">✕</button>
+            </div>
+
+            ${errorMsg ? `<div style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; padding: 8px 12px; font-size: 11px; border-radius: 4px; margin-bottom: 14px;">⚠️ ${errorMsg}</div>` : ''}
+
+            <div style="margin-bottom: 20px;">
+              <button id="lobby-create-btn" style="width: 100%; background: linear-gradient(135deg, #0284c7, #0369a1); border: 1px solid #38bdf8; color: #ffffff; padding: 14px; font-weight: 900; font-size: 14px; letter-spacing: 2px; cursor: pointer; border-radius: 4px; font-family: inherit; transition: transform 0.1s;">
+                CREATE NEW ARENA ROOM
+              </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #64748b; font-size: 11px;">
+              <div style="flex: 1; height: 1px; background: #1e293b;"></div>
+              <span>OR JOIN WITH CODE</span>
+              <div style="flex: 1; height: 1px; background: #1e293b;"></div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+              <input id="lobby-code-input" placeholder="4-LETTER CODE" maxlength="4" style="flex: 1; background: #0f172a; border: 1px solid #334155; color: #38bdf8; font-size: 18px; font-weight: 900; letter-spacing: 4px; text-transform: uppercase; padding: 10px 14px; border-radius: 4px; text-align: center; font-family: inherit; outline: none;" />
+              <button id="lobby-join-btn" style="background: #1e293b; border: 1px solid #06b6d4; color: #38bdf8; font-weight: 800; font-size: 13px; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-family: inherit;">JOIN</button>
+            </div>
+
+            <div style="font-size: 10px; color: #64748b; text-align: center;">
+              Requires local server running (<code style="color: #38bdf8;">npm run server</code>).
+            </div>
+          </div>
+        `;
+
+        document.getElementById('lobby-close-btn')?.addEventListener('click', () => {
+          overlay.remove();
+        });
+
+        document.getElementById('lobby-create-btn')?.addEventListener('click', () => {
+          net.createRoom(
+            this.selectedGamerTag,
+            this.selectedRig,
+            this.selectedWeapon,
+            this.selectedMap,
+            this.selectedMode
+          );
+        });
+
+        document.getElementById('lobby-join-btn')?.addEventListener('click', () => {
+          const inputEl = document.getElementById('lobby-code-input') as HTMLInputElement;
+          const code = (inputEl?.value || '').trim().toUpperCase();
+          if (!code) return;
+          net.joinRoom(
+            code,
+            this.selectedGamerTag,
+            this.selectedRig,
+            this.selectedWeapon
+          );
         });
       }
     };
 
-    if (deployBtn) {
-      deployBtn.addEventListener('click', handleDeploy);
-      deployBtn.addEventListener('pointerdown', handleDeploy);
-    }
-    if (deployBtnMobile) {
-      deployBtnMobile.addEventListener('click', handleDeploy);
-      deployBtnMobile.addEventListener('pointerdown', handleDeploy);
-    }
+    renderLobbyContent();
+
+    net.connect().then((connected) => {
+      if (!connected) {
+        renderLobbyContent(undefined, 'Cannot connect to game server (ws://localhost:8080). Make sure "npm run server" is running.');
+      }
+    });
+
+    net.onRoomState = (state) => {
+      renderLobbyContent(state);
+    };
+
+    net.onError = (errMsg) => {
+      renderLobbyContent(undefined, errMsg);
+    };
+
+    net.onMatchStarting = (data) => {
+      let count = data.countdownSec || 3;
+      overlay.innerHTML = `
+        <div style="background: #090d16; border: 2px solid #22c55e; box-shadow: 0 0 50px rgba(34, 197, 94, 0.5); padding: 40px; text-align: center; border-radius: 8px;">
+          <div style="font-size: 13px; font-weight: 800; color: #22c55e; letter-spacing: 3px; margin-bottom: 10px;">OPERATIVES SYNCHRONIZED</div>
+          <div style="font-size: 32px; font-weight: 900; color: #ffffff; letter-spacing: 4px; margin-bottom: 20px;">DEPLOYING TO SECTOR 234</div>
+          <div id="lobby-countdown-num" style="font-size: 72px; font-weight: 900; color: #38bdf8; text-shadow: 0 0 20px #38bdf8;">${count}</div>
+        </div>
+      `;
+
+      const timer = setInterval(() => {
+        count--;
+        const numEl = document.getElementById('lobby-countdown-num');
+        if (numEl) numEl.innerText = `${count}`;
+        if (count <= 0) {
+          clearInterval(timer);
+          overlay.remove();
+          this.executeDeploy(true, net.currentRoomId || undefined);
+        }
+      }, 1000);
+    };
   }
 
   private startRadarAnimation(): void {

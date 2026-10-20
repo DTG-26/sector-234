@@ -12,6 +12,8 @@ import { WeaponSystem } from '../systems/WeaponSystem';
 import { RigSystem } from '../systems/RigSystem';
 import { ParticleSystem3D } from '../systems/ParticleSystem3D';
 import { WEAPON_REGISTRY } from '../config/constants';
+import { RemotePlayerController } from '../network/RemotePlayerController';
+import { NetworkLobbyPlayer } from '../network/NetworkTypes';
 
 export class ModeManager {
   public currentMode: GameModeType = GameModeType.ODOGWU_STASH;
@@ -23,6 +25,7 @@ export class ModeManager {
 
   public players: Player[] = [];
   public bots: BotAI[] = [];
+  public remoteControllers: Map<string, RemotePlayerController> = new Map();
   public pickups: Pickup3D[] = [];
   public isMatchOver: boolean = false;
   private scene: THREE.Scene;
@@ -46,6 +49,7 @@ export class ModeManager {
     }
     this.players = [];
     this.bots = [];
+    this.remoteControllers.clear();
 
     // 3. Destroy all pickups
     for (const pickup of this.pickups) {
@@ -169,6 +173,161 @@ export class ModeManager {
             { x: 40, y: 17.5, type: 'health' as const, respawn: true }, // Central grand palace deck
             { x: 64, y: 14.5, type: 'health' as const, respawn: true }, // East Dala fortress lower bastion
             { x: 40, y: 27.5, type: 'health' as const, respawn: true }, // Upper palace terrace
+          ];
+
+    initialPickups.forEach((p) => {
+      const pk = new Pickup3D(this.scene, p.type, p.x, p.y, 25000, p.wId, p.respawn);
+      this.pickups.push(pk);
+    });
+
+    return localPlayer;
+  }
+
+  public initMultiplayerMatch(
+    modeType: GameModeType,
+    localPlayerId: string,
+    localPlayerName: string,
+    localRig: MovementRigType,
+    mapId: MapId,
+    networkPlayers: NetworkLobbyPlayer[],
+    particles: ParticleSystem3D
+  ): Player {
+    this.cleanup();
+    this.currentMode = modeType;
+    this.currentMap = mapId;
+    this.isMatchOver = false;
+
+    if (modeType === GameModeType.ODOGWU_STASH || modeType === GameModeType.VAULT_HEIST) {
+      this.heistMode = new HeistModeManager(this.scene, mapId);
+    } else {
+      this.apapaMode = new ApapaLockdownMode(this.scene);
+    }
+
+    const spawnPoints =
+      mapId === MapId.LAGOS_GOSLOW
+        ? [
+            { x: 16, y: 6.5 },
+            { x: 24, y: 6.5 },
+            { x: 38, y: 22.5 },
+            { x: 56, y: 6.5 },
+            { x: 64, y: 28.5 },
+            { x: 12, y: 24.5 },
+          ]
+        : [
+            { x: 14, y: 14.5 },
+            { x: 26, y: 18.5 },
+            { x: 42, y: 18.5 },
+            { x: 52, y: 26.5 },
+            { x: 62, y: 34.5 },
+            { x: 20, y: 24.5 },
+          ];
+
+    let spawnIdx = 0;
+
+    // 1. Create Local Player
+    const localSpawn = spawnPoints[spawnIdx++];
+    const localPlayer = new Player(
+      this.scene,
+      localPlayerId,
+      localPlayerName || 'Operative_01',
+      localSpawn.x,
+      localSpawn.y,
+      true,
+      localRig
+    );
+    this.players.push(localPlayer);
+
+    // 2. Add Remote Human Players
+    this.remoteControllers.clear();
+    networkPlayers.forEach((np) => {
+      if (np.id === localPlayerId) return;
+      const sp = spawnPoints[spawnIdx % spawnPoints.length];
+      spawnIdx++;
+      const remotePlayer = new Player(
+        this.scene,
+        np.id,
+        np.name,
+        sp.x,
+        sp.y,
+        false,
+        np.rig
+      );
+      remotePlayer.stats.primaryWeapon = np.primaryWeapon;
+      remotePlayer.stats.activeWeapon = np.primaryWeapon;
+      remotePlayer.mesh.setWeapon(np.primaryWeapon);
+      this.players.push(remotePlayer);
+
+      const controller = new RemotePlayerController(remotePlayer, particles);
+      this.remoteControllers.set(np.id, controller);
+    });
+
+    // 3. Fill remaining slots with Bots up to 6 players total
+    const neededBots = Math.max(0, 6 - this.players.length);
+    const botPool =
+      mapId === MapId.LAGOS_GOSLOW
+        ? [
+            { id: 'bot_sarki', name: 'Sarkin_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.RIFLE_XAG47 },
+            { id: 'bot_arewa', name: 'Arewa_Sniper', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.RAIL_SNIPER },
+            { id: 'bot_danauta', name: 'Dan_auta_234', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.AKIMBO_UZIS },
+            { id: 'bot_ghost', name: 'Ghost_Lagos', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.GHOST_SMG },
+            { id: 'bot_ekoviper', name: 'Eko_Viper', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12 },
+          ]
+        : [
+            { id: 'bot_sarki', name: 'Sarkin_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.RIFLE_XAG47 },
+            { id: 'bot_arewa', name: 'Arewa_Sniper', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.RAIL_SNIPER },
+            { id: 'bot_danauta', name: 'Dan_auta_234', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.AKIMBO_UZIS },
+            { id: 'bot_ghost', name: 'Ghost_Lagos', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.GHOST_SMG },
+            { id: 'bot_ekoviper', name: 'Eko_Viper', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12 },
+          ];
+
+    for (let i = 0; i < neededBots; i++) {
+      const cfg = botPool[i % botPool.length];
+      const sp = spawnPoints[spawnIdx % spawnPoints.length];
+      spawnIdx++;
+      const bot = new Player(this.scene, cfg.id, cfg.name, sp.x, sp.y, false, cfg.rig);
+      bot.stats.primaryWeapon = cfg.weapon;
+      bot.stats.activeWeapon = cfg.weapon;
+      bot.mesh.setWeapon(cfg.weapon);
+      this.players.push(bot);
+
+      const ai = new BotAI(bot);
+      this.bots.push(ai);
+    }
+
+    // 4. Initial Pickups
+    const initialPickups =
+      mapId === MapId.LAGOS_GOSLOW
+        ? [
+            { x: 8, y: 6.5, type: 'cash' as const, respawn: false },
+            { x: 22, y: 6.5, type: 'cash' as const, respawn: false },
+            { x: 38, y: 22.5, type: 'cash' as const, respawn: false },
+            { x: 54, y: 6.5, type: 'cash' as const, respawn: false },
+            { x: 70, y: 6.5, type: 'cash' as const, respawn: false },
+            { x: 14, y: 28.5, type: 'cash' as const, respawn: false },
+            { x: 26, y: 22.5, type: 'weapon' as const, wId: WeaponId.SHOTGUN_AA12, respawn: true },
+            { x: 50, y: 22.5, type: 'weapon' as const, wId: WeaponId.BUNKER_RPG, respawn: true },
+            { x: 12, y: 3.5, type: 'health' as const, respawn: true },
+            { x: 64, y: 3.5, type: 'health' as const, respawn: true },
+            { x: 28, y: 7.5, type: 'health' as const, respawn: true },
+            { x: 44, y: 22.5, type: 'health' as const, respawn: true },
+            { x: 16, y: 29.5, type: 'health' as const, respawn: true },
+          ]
+        : [
+            { x: 10, y: 13.5, type: 'cash' as const, respawn: false },
+            { x: 25, y: 3.5, type: 'cash' as const, respawn: false },
+            { x: 24, y: 17.5, type: 'cash' as const, respawn: false },
+            { x: 40, y: 17.5, type: 'cash' as const, respawn: false },
+            { x: 55, y: 17.5, type: 'cash' as const, respawn: false },
+            { x: 65, y: 3.5, type: 'cash' as const, respawn: false },
+            { x: 40, y: 27.5, type: 'cash' as const, respawn: false },
+            { x: 18, y: 13.5, type: 'weapon' as const, wId: WeaponId.BUNKER_RPG, respawn: true },
+            { x: 62, y: 25.5, type: 'weapon' as const, wId: WeaponId.VULCAN_MINIGUN, respawn: true },
+            { x: 14, y: 3.5, type: 'health' as const, respawn: true },
+            { x: 66, y: 3.5, type: 'health' as const, respawn: true },
+            { x: 10, y: 13.5, type: 'health' as const, respawn: true },
+            { x: 40, y: 17.5, type: 'health' as const, respawn: true },
+            { x: 64, y: 14.5, type: 'health' as const, respawn: true },
+            { x: 40, y: 27.5, type: 'health' as const, respawn: true },
           ];
 
     initialPickups.forEach((p) => {
@@ -307,7 +466,11 @@ export class ModeManager {
       this.checkPickupCollisions(p, onAudioChime);
     });
 
-    // 4. Update Bot AIs
+    // 4. Update Remote Human Players & Bot AIs
+    this.remoteControllers.forEach((rc) => {
+      rc.update(dt);
+    });
+
     const isExtr = this.isExtractionActive();
     const extrPos = this.getExtractionPos();
 

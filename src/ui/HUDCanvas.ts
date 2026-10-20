@@ -68,10 +68,6 @@ export class HUDCanvas {
 
     ctx.clearRect(0, 0, w, h);
 
-    // 0. Tactical Sniper Scope Overlay (Rail-Sniper)
-    if (localPlayer.stats.activeWeapon === WeaponId.RAIL_SNIPER && !localPlayer.stats.isDead) {
-      this.renderSniperScope(ctx, w, h, localPlayer, input);
-    }
 
     // 1. Top Tactical Status Bar
     this.renderTopBar(ctx, w, h, localPlayer, modeManager);
@@ -384,106 +380,6 @@ export class HUDCanvas {
     ctx.arc(rightKnobX, rightKnobY, 3, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
-    ctx.restore();
-  }
-
-  private renderSniperScope(
-    ctx: CanvasRenderingContext2D,
-    w: number,
-    h: number,
-    _player: Player,
-    _input: InputManager
-  ): void {
-    const cx = w * 0.5;
-    const cy = h * 0.5;
-    const scopeRadius = Math.min(w, h) * 0.44;
-
-    ctx.save();
-
-    // 1. Dark Vignette Outer Mask
-    const grad = ctx.createRadialGradient(cx, cy, scopeRadius * 0.35, cx, cy, scopeRadius * 1.35);
-    grad.addColorStop(0, 'rgba(2, 6, 23, 0.0)');
-    grad.addColorStop(0.65, 'rgba(2, 6, 23, 0.45)');
-    grad.addColorStop(1.0, 'rgba(2, 6, 23, 0.88)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
-
-    // 2. Circular Scope Iris Ring
-    ctx.beginPath();
-    ctx.arc(cx, cy, scopeRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-
-    // Secondary Inner Target Circle
-    ctx.beginPath();
-    ctx.arc(cx, cy, scopeRadius * 0.28, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    // 3. Precision Crosshairs & Mil-Dot Tick Marks
-    ctx.beginPath();
-    ctx.moveTo(cx - scopeRadius, cy);
-    ctx.lineTo(cx - 24, cy);
-    ctx.moveTo(cx + 24, cy);
-    ctx.lineTo(cx + scopeRadius, cy);
-
-    ctx.moveTo(cx, cy - scopeRadius);
-    ctx.lineTo(cx, cy - 24);
-    ctx.moveTo(cx, cy + 24);
-    ctx.lineTo(cx, cy + scopeRadius);
-
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    // Mil-Dot elevation hash marks
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
-    ctx.lineWidth = 1.0;
-    ctx.font = '700 9px "JetBrains Mono", monospace';
-    ctx.fillStyle = '#38bdf8';
-    ctx.textAlign = 'center';
-
-    const tickDistances = [45, 90, 135];
-    tickDistances.forEach((d, idx) => {
-      ctx.beginPath();
-      ctx.moveTo(cx - d, cy - 4);
-      ctx.lineTo(cx - d, cy + 4);
-      ctx.moveTo(cx + d, cy - 4);
-      ctx.lineTo(cx + d, cy + 4);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(cx - 6, cy + d);
-      ctx.lineTo(cx + 6, cy + d);
-      ctx.stroke();
-      ctx.fillText(`${(idx + 1) * 10}m`, cx + 18, cy + d + 3);
-    });
-
-    // 4. Center Target Chevron
-    ctx.beginPath();
-    ctx.moveTo(cx - 6, cy + 6);
-    ctx.lineTo(cx, cy);
-    ctx.lineTo(cx + 6, cy + 6);
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // 5. Digital Telemetry
-    ctx.font = '800 11px "JetBrains Mono", monospace';
-    ctx.fillStyle = '#38bdf8';
-    ctx.textAlign = 'left';
-    ctx.fillText('⚡ RAIL ACCELERATOR // CHARGED', cx - scopeRadius + 18, cy - scopeRadius * 0.7);
-
-    ctx.textAlign = 'right';
-    ctx.fillText('4.5x MAG // 12.7mm HYPERVELOCITY', cx + scopeRadius - 18, cy - scopeRadius * 0.7);
-
-    ctx.textAlign = 'left';
-    ctx.font = '700 9px "JetBrains Mono", monospace';
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
-    ctx.fillText('FOV: 55° // TRAJECTORY: FLAT', cx - scopeRadius + 18, cy + scopeRadius * 0.7);
-
     ctx.restore();
   }
 

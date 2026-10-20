@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: xag-protocol-zero-server
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run server
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: NODE_VERSION
+        value: 24.2.0
