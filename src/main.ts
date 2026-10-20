@@ -111,7 +111,7 @@ menu.showMainMenu(startMatch);
 // 5. Main Game Loop Hook
 engine.onUpdate((dt: number) => {
   skyline.update(dt);
-  tileMap.updateDebris(dt);
+  tileMap.update(dt);
   particles.update(dt, tileMap);
   vision.update(dt);
   rigSystem.update(dt);

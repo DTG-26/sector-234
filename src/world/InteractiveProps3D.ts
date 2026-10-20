@@ -45,13 +45,15 @@ export class InteractiveProps3D {
   public createVaultDoor(x: number, y: number): void {
     const geom = new THREE.BoxGeometry(4.0, 5.0, 1.2);
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x475569,
-      emissive: 0x1e293b,
-      roughness: 0.4,
-      metalness: 0.1,
+      color: 0x334155,
+      emissive: 0x0f172a,
+      roughness: 0.35,
+      metalness: 0.15,
     });
     this.vaultDoorMesh = new THREE.Mesh(geom, mat);
     this.vaultDoorMesh.position.set(x, y + 2.5, 0);
+    this.vaultDoorMesh.castShadow = true;
+    this.vaultDoorMesh.receiveShadow = true;
     this.scene.add(this.vaultDoorMesh);
   }
 
