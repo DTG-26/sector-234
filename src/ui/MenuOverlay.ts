@@ -589,16 +589,214 @@ export class MenuOverlay {
           font-weight: 800;
         }
 
-        /* Responsive Fallback for Compact Screens */
+        /* Mobile Segmented Control Bar */
+        .xag-mobile-tabs {
+          display: none;
+        }
+
+        .xag-mobile-deploy-bar {
+          display: none;
+        }
+
+        /* Responsive Mobile Styling (< 860px) */
         @media screen and (max-width: 860px) {
+          .xag-war-room {
+            padding: 8px 10px calc(76px + env(safe-area-inset-bottom, 8px));
+          }
+
+          /* Compact Single-Row Mobile Header */
+          .xag-top-bar {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            gap: 6px;
+          }
+          .xag-brand-tag {
+            gap: 6px;
+          }
+          .xag-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+          }
+          .xag-title {
+            font-size: 12px;
+            letter-spacing: 1px;
+            white-space: nowrap;
+          }
+          .xag-sub {
+            display: none;
+          }
+          .xag-net-status {
+            padding: 4px 7px;
+            font-size: 9px;
+            letter-spacing: 0.5px;
+          }
+          .xag-vault-badge {
+            padding: 4px 8px;
+            gap: 5px;
+          }
+          .xag-vault-label-text {
+            display: none;
+          }
+          .xag-vault-val {
+            font-size: 11px;
+          }
+
+          /* Show Mobile Segmented Tabs */
+          .xag-mobile-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+            z-index: 2;
+            position: relative;
+          }
+          .xag-tab-btn {
+            flex: 1;
+            background: #0a100d;
+            border: 1px solid #1c2b22;
+            color: #9ca3af;
+            padding: 8px 4px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', 'Chakra Petch', monospace;
+            cursor: pointer;
+            text-align: center;
+            transition: 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            letter-spacing: 1px;
+          }
+          .xag-tab-btn:hover {
+            color: #ffffff;
+            border-color: rgba(34, 197, 94, 0.5);
+          }
+          .xag-tab-btn.active {
+            background: rgba(0, 135, 81, 0.22);
+            border-color: #22c55e;
+            color: #22c55e;
+            box-shadow: 0 0 14px rgba(34, 197, 94, 0.25);
+          }
+          .xag-tab-num {
+            font-size: 9px;
+            padding: 1px 4px;
+            background: rgba(0, 135, 81, 0.35);
+            border-radius: 2px;
+            color: #ffffff;
+          }
+
+          /* Tab-Driven Column Visibility */
           .xag-grid-container {
-            grid-template-columns: 1fr;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+          }
+          .xag-column {
+            display: none;
+            width: 100%;
+            height: 100%;
+            flex: 1;
+            min-height: 0;
             overflow-y: auto;
+            padding: 10px 12px;
+            border-radius: 4px;
+          }
+          .xag-column.mobile-active {
+            display: flex;
+          }
+
+          /* Hide Column 3 internal deploy button on mobile (handled by sticky bar) */
+          .xag-column .xag-deploy-container {
+            display: none;
+          }
+
+          /* Show Persistent Mobile Deploy Bar */
+          .xag-mobile-deploy-bar {
+            display: block;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 8px));
+            background: linear-gradient(180deg, transparent 0%, rgba(5, 8, 6, 0.94) 28%, #050806 100%);
+            z-index: 99;
+            backdrop-filter: blur(8px);
+          }
+          .xag-mobile-deploy-bar .xag-deploy-btn {
+            padding: 13px 14px;
+            font-size: 14px;
+            letter-spacing: 2px;
+          }
+
+          /* Touch Optimization for Weapon & Map Cards */
+          .xag-weapon-card {
+            padding: 8px 10px;
+            margin-bottom: 10px;
+          }
+          .xag-cycle-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+          }
+          .xag-map-card {
+            padding: 8px 10px;
+            margin-bottom: 8px;
+          }
+          .xag-map-radar-frame {
+            height: 65px;
+          }
+          .xag-rig-card {
+            padding: 8px 10px;
+            margin-bottom: 6px;
+          }
+          .xag-input-box {
+            padding: 6px 8px;
+            margin-bottom: 10px;
+          }
+          .xag-armory-btn {
+            padding: 10px;
+            margin-top: 6px;
+          }
+        }
+
+        /* Ultra-compact Landscape Phone Breakpoint (height <= 500px) */
+        @media screen and (max-height: 500px) and (orientation: landscape) {
+          .xag-war-room {
+            padding: 4px 8px calc(52px + env(safe-area-inset-bottom, 4px));
           }
           .xag-top-bar {
-            flex-direction: column;
-            gap: 8px;
-            align-items: flex-start;
+            padding: 3px 8px;
+            margin-bottom: 4px;
+          }
+          .xag-mobile-tabs {
+            margin-bottom: 4px;
+          }
+          .xag-tab-btn {
+            padding: 4px 4px;
+            font-size: 10px;
+          }
+          .xag-column {
+            padding: 6px 8px;
+          }
+          .xag-map-radar-frame {
+            height: 48px;
+          }
+          .xag-mobile-deploy-bar {
+            padding: 4px 10px calc(4px + env(safe-area-inset-bottom, 4px));
+          }
+          .xag-mobile-deploy-bar .xag-deploy-btn {
+            padding: 8px 10px;
+            font-size: 12px;
+          }
+          .xag-mobile-deploy-bar .xag-deploy-decor {
+            display: none;
           }
         }
       </style>
@@ -622,17 +820,30 @@ export class MenuOverlay {
           <div id="btn-top-vault" class="xag-vault-badge" title="Open Syndicate Offshore Vault">
             <span style="font-size: 13px; color: #22c55e;">[◆]</span>
             <div>
-              <div style="font-size: 9px; color: #9ca3af; font-weight: 700;">VAULT BALANCE</div>
+              <div class="xag-vault-label-text" style="font-size: 9px; color: #9ca3af; font-weight: 700;">VAULT BALANCE</div>
               <div class="xag-vault-val">₦${profile.cash_balance.toLocaleString()}</div>
             </div>
           </div>
+        </div>
+
+        <!-- Mobile Segmented Tabs Bar -->
+        <div class="xag-mobile-tabs">
+          <button type="button" class="xag-tab-btn active" data-tab="01">
+            <span class="xag-tab-num">01</span> LOADOUT
+          </button>
+          <button type="button" class="xag-tab-btn" data-tab="02">
+            <span class="xag-tab-num">02</span> THEATER
+          </button>
+          <button type="button" class="xag-tab-btn" data-tab="03">
+            <span class="xag-tab-num">03</span> MOBILITY
+          </button>
         </div>
 
         <!-- 3-Column Tactical Command Grid -->
         <div class="xag-grid-container">
 
           <!-- 01 // OPERATOR DOSSIER -->
-          <div class="xag-column">
+          <div id="col-dossier" class="xag-column mobile-active">
             <div class="xag-col-header">
               <span>01 // OPERATOR DOSSIER</span>
               <span class="xag-col-sublabel">ID: #${profile.id ? profile.id.slice(-4).toUpperCase() : '234'}</span>
@@ -749,7 +960,7 @@ export class MenuOverlay {
           </div>
 
           <!-- 02 // DEPLOYMENT THEATER -->
-          <div class="xag-column">
+          <div id="col-theater" class="xag-column">
             <div class="xag-col-header">
               <span>02 // DEPLOYMENT THEATER</span>
               <span class="xag-col-sublabel">SECTOR MAP</span>
@@ -804,7 +1015,7 @@ export class MenuOverlay {
           </div>
 
           <!-- 03 // TACTICAL RIG + DEPLOY LAUNCHER -->
-          <div class="xag-column">
+          <div id="col-rigs" class="xag-column">
             <div class="xag-col-header">
               <span>03 // TACTICAL RIG</span>
               <span class="xag-col-sublabel">MOBILITY CORE</span>
@@ -866,8 +1077,39 @@ export class MenuOverlay {
           </div>
 
         </div>
+
+        <!-- Mobile Sticky Deploy Bar -->
+        <div class="xag-mobile-deploy-bar">
+          <button type="button" id="menu-deploy-btn-mobile" class="xag-deploy-btn">
+            <div class="xag-deploy-decor">◢█████████████████████◣</div>
+            <div>█  DEPLOY TO SECTOR 234 █</div>
+            <div class="xag-deploy-decor">◥█████████████████████◤</div>
+          </button>
+        </div>
       </div>
     `;
+
+    // 0. Hook Mobile Segmented Tabs
+    const tabButtons = this.container.querySelectorAll<HTMLButtonElement>('.xag-tab-btn');
+    const colDossier = document.getElementById('col-dossier');
+    const colTheater = document.getElementById('col-theater');
+    const colRigs = document.getElementById('col-rigs');
+
+    tabButtons.forEach((tab) => {
+      const switchTab = () => {
+        tabButtons.forEach((b) => b.classList.remove('active'));
+        tab.classList.add('active');
+        const tabKey = tab.getAttribute('data-tab');
+
+        if (colDossier) colDossier.classList.toggle('mobile-active', tabKey === '01');
+        if (colTheater) colTheater.classList.toggle('mobile-active', tabKey === '02');
+        if (colRigs) colRigs.classList.toggle('mobile-active', tabKey === '03');
+
+        this.audio?.playUISelect();
+      };
+      tab.addEventListener('click', switchTab);
+      tab.addEventListener('pointerdown', switchTab);
+    });
 
     // 1. Hook Callsign
     const callsignInput = document.getElementById('xag-callsign-input') as HTMLInputElement;
@@ -1039,8 +1281,9 @@ export class MenuOverlay {
     // 7. Start Animated Canvas Radars in Phosphor Tactical Green
     this.startRadarAnimation();
 
-    // 8. Deploy Button Handler
-    const deployBtn = document.getElementById('menu-deploy-btn')!;
+    // 8. Deploy Button Handlers (Desktop & Mobile Sticky)
+    const deployBtn = document.getElementById('menu-deploy-btn');
+    const deployBtnMobile = document.getElementById('menu-deploy-btn-mobile');
     let deployed = false;
     const handleDeploy = (e: Event) => {
       e.stopPropagation();
@@ -1086,8 +1329,14 @@ export class MenuOverlay {
       }
     };
 
-    deployBtn.addEventListener('click', handleDeploy);
-    deployBtn.addEventListener('pointerdown', handleDeploy);
+    if (deployBtn) {
+      deployBtn.addEventListener('click', handleDeploy);
+      deployBtn.addEventListener('pointerdown', handleDeploy);
+    }
+    if (deployBtnMobile) {
+      deployBtnMobile.addEventListener('click', handleDeploy);
+      deployBtnMobile.addEventListener('pointerdown', handleDeploy);
+    }
   }
 
   private startRadarAnimation(): void {

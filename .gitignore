@@ -34,3 +34,5 @@ scratch/
 .system_generated/
 .netlify/
 *.exe
+
+.vercel
