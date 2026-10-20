@@ -5,6 +5,7 @@ export enum NetMessageType {
   JOIN_ROOM = 'JOIN_ROOM',
   ROOM_STATE = 'ROOM_STATE',
   SET_READY = 'SET_READY',
+  TOGGLE_BOTS = 'TOGGLE_BOTS',
   START_MATCH = 'START_MATCH',
   MATCH_STARTING = 'MATCH_STARTING',
   PLAYER_LEFT = 'PLAYER_LEFT',
@@ -62,6 +63,7 @@ export interface JoinRoomPayload {
   weapon: WeaponId;
   mapId: MapId;
   mode: GameModeType;
+  fillBots?: boolean;
 }
 
 export interface RoomStatePayload {
@@ -72,6 +74,7 @@ export interface RoomStatePayload {
   mode: GameModeType;
   players: NetworkLobbyPlayer[];
   matchActive: boolean;
+  fillBots: boolean;
 }
 
 export interface MatchStartingPayload {
@@ -79,6 +82,11 @@ export interface MatchStartingPayload {
   mapId: MapId;
   mode: GameModeType;
   seed: number;
+  fillBots: boolean;
+}
+
+export interface ToggleBotsPayload {
+  fillBots: boolean;
 }
 
 export interface ClientTickPayload {

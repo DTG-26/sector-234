@@ -877,7 +877,7 @@ export class MenuOverlay {
     });
   }
 
-  private executeDeploy(isMultiplayer = false, roomId?: string): void {
+  private executeDeploy(isMultiplayer = false, roomId?: string, fillBotsOverride?: boolean): void {
     this.audio?.playUIDeploy();
 
     // Stop radar
@@ -905,6 +905,8 @@ export class MenuOverlay {
     const touchControls = document.getElementById('touch-controls');
     if (touchControls) touchControls.style.display = 'block';
 
+    const finalFillBots = fillBotsOverride !== undefined ? fillBotsOverride : this.fillBots;
+
     if (this.onStartGameCallback) {
       this.onStartGameCallback({
         gamerTag: this.selectedGamerTag,
@@ -915,7 +917,7 @@ export class MenuOverlay {
         secondaryWeapon: this.selectedSecondaryWeapon,
         isMultiplayer,
         roomId,
-        fillBots: this.fillBots,
+        fillBots: finalFillBots,
         teamSize: this.teamSize,
       });
     }
@@ -964,10 +966,23 @@ export class MenuOverlay {
               </div>
             </div>
 
-            <div style="display: flex; gap: 12px; font-size: 11px; color: #94a3b8; margin-bottom: 16px; background: #0f172a; padding: 8px 12px; border-radius: 4px; border: 1px solid #1e293b;">
-              <div>MAP: <span style="color: #ffffff; font-weight: 700;">${this.selectedMap === MapId.LAGOS_GOSLOW ? 'LAGOS GO-SLOW' : 'BIRNIN KANO'}</span></div>
-              <div>MODE: <span style="color: #ffffff; font-weight: 700;">${this.selectedMode}</span></div>
-              <div>OPERATIVES: <span style="color: #38bdf8; font-weight: 700;">${roomState.players.length} / 6</span></div>
+            <div style="display: flex; gap: 12px; font-size: 11px; color: #94a3b8; margin-bottom: 16px; background: #0f172a; padding: 8px 12px; border-radius: 4px; border: 1px solid #1e293b; align-items: center; justify-content: space-between;">
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <div>MAP: <span style="color: #ffffff; font-weight: 700;">${this.selectedMap === MapId.LAGOS_GOSLOW ? 'LAGOS GO-SLOW' : 'BIRNIN KANO'}</span></div>
+                <div>MODE: <span style="color: #ffffff; font-weight: 700;">${this.selectedMode}</span></div>
+                <div>OPERATIVES: <span style="color: #38bdf8; font-weight: 700;">${roomState.players.length} / 6</span></div>
+              </div>
+              <div>
+                ${isHost ? `
+                  <button id="lobby-bot-btn" type="button" style="background: ${roomState.fillBots ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; border: 1px solid ${roomState.fillBots ? '#22c55e' : '#ef4444'}; color: ${roomState.fillBots ? '#4ade80' : '#f87171'}; padding: 4px 10px; font-size: 11px; font-weight: 800; cursor: pointer; border-radius: 4px; font-family: inherit;">
+                    ${roomState.fillBots ? '🤖 BOTS: ON' : '✕ BOTS: OFF'}
+                  </button>
+                ` : `
+                  <div style="font-size: 11px; color: ${roomState.fillBots ? '#4ade80' : '#f87171'}; font-weight: 800; background: ${roomState.fillBots ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; border: 1px solid ${roomState.fillBots ? '#22c55e' : '#ef4444'}; padding: 4px 8px; border-radius: 4px;">
+                    ${roomState.fillBots ? '🤖 BOTS: ON' : '✕ BOTS: OFF'}
+                  </div>
+                `}
+              </div>
             </div>
 
             <!-- Player Roster -->
@@ -1019,6 +1034,10 @@ export class MenuOverlay {
 
         document.getElementById('lobby-ready-btn')?.addEventListener('click', () => {
           net.setReady(!isReady);
+        });
+
+        document.getElementById('lobby-bot-btn')?.addEventListener('click', () => {
+          net.toggleBots(!roomState.fillBots);
         });
 
         document.getElementById('lobby-start-btn')?.addEventListener('click', () => {
@@ -1091,7 +1110,8 @@ export class MenuOverlay {
             this.selectedRig,
             this.selectedWeapon,
             this.selectedMap,
-            this.selectedMode
+            this.selectedMode,
+            this.fillBots
           );
         });
 
@@ -1142,7 +1162,7 @@ export class MenuOverlay {
         if (count <= 0) {
           clearInterval(timer);
           overlay.remove();
-          this.executeDeploy(true, net.currentRoomId || undefined);
+          this.executeDeploy(true, net.currentRoomId || undefined, data.fillBots);
         }
       }, 1000);
     };

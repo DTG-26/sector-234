@@ -169,9 +169,10 @@ function handleMessage(playerId: string, ws: WebSocket, msg: GenericNetMessage):
       if (!targetRoomId) {
         // Create new room
         targetRoomId = generateRoomCode();
-        const newRoom = new Room(targetRoomId, playerId, payload.mapId, payload.mode);
+        const fillBots = payload.fillBots !== undefined ? payload.fillBots : true;
+        const newRoom = new Room(targetRoomId, playerId, payload.mapId, payload.mode, fillBots);
         rooms.set(targetRoomId, newRoom);
-        console.log(`[NET] Created new room ${targetRoomId} for host ${playerId}`);
+        console.log(`[NET] Created new room ${targetRoomId} for host ${playerId} (fillBots: ${fillBots})`);
       }
 
       const targetRoom = rooms.get(targetRoomId);
@@ -208,6 +209,13 @@ function handleMessage(playerId: string, ws: WebSocket, msg: GenericNetMessage):
         payload.rig,
         payload.weapon
       );
+      break;
+    }
+
+    case NetMessageType.TOGGLE_BOTS: {
+      if (room && msg.payload) {
+        room.setFillBots(playerId, !!msg.payload.fillBots);
+      }
       break;
     }
 

@@ -148,7 +148,8 @@ export class NetworkClient {
     rig: MovementRigType,
     weapon: WeaponId,
     mapId: MapId = MapId.BIRNIN_KANO,
-    mode: GameModeType = GameModeType.ODOGWU_STASH
+    mode: GameModeType = GameModeType.ODOGWU_STASH,
+    fillBots: boolean = true
   ): void {
     const payload: JoinRoomPayload = {
       roomId: '', // Empty triggers server to generate room code
@@ -157,6 +158,7 @@ export class NetworkClient {
       weapon,
       mapId,
       mode,
+      fillBots,
     };
     this.send(NetMessageType.JOIN_ROOM, payload);
   }
@@ -180,6 +182,10 @@ export class NetworkClient {
 
   public setReady(ready: boolean): void {
     this.send(NetMessageType.SET_READY, { ready });
+  }
+
+  public toggleBots(fillBots: boolean): void {
+    this.send(NetMessageType.TOGGLE_BOTS, { fillBots });
   }
 
   public startMatch(): void {

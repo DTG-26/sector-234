@@ -10,14 +10,16 @@ var Room = class {
   mapId;
   mode;
   matchActive = false;
+  fillBots = true;
   clients = /* @__PURE__ */ new Map();
   tickCount = 0;
   snapshotInterval = null;
-  constructor(id, hostId, mapId = "BIRNIN_KANO" /* BIRNIN_KANO */, mode = "ODOGWU_STASH" /* ODOGWU_STASH */) {
+  constructor(id, hostId, mapId = "BIRNIN_KANO" /* BIRNIN_KANO */, mode = "ODOGWU_STASH" /* ODOGWU_STASH */, fillBots = true) {
     this.id = id;
     this.hostId = hostId;
     this.mapId = mapId;
     this.mode = mode;
+    this.fillBots = fillBots;
   }
   get playerCount() {
     return this.clients.size;
@@ -78,15 +80,23 @@ var Room = class {
       client.lobby.ping = ping;
     }
   }
+  setFillBots(hostId, fillBots) {
+    if (this.hostId === hostId) {
+      this.fillBots = fillBots;
+      console.log(`[ROOM ${this.id}] Host toggled fillBots: ${this.fillBots}`);
+      this.broadcastRoomState();
+    }
+  }
   startMatch(hostId) {
     if (this.hostId !== hostId || this.matchActive) return false;
     this.matchActive = true;
-    console.log(`[ROOM ${this.id}] Match starting! Map: ${this.mapId}, Mode: ${this.mode}`);
+    console.log(`[ROOM ${this.id}] Match starting! Map: ${this.mapId}, Mode: ${this.mode}, Bots: ${this.fillBots}`);
     const payload = {
       countdownSec: 3,
       mapId: this.mapId,
       mode: this.mode,
-      seed: Math.floor(Math.random() * 1e5)
+      seed: Math.floor(Math.random() * 1e5),
+      fillBots: this.fillBots
     };
     this.broadcast({
       type: "MATCH_STARTING" /* MATCH_STARTING */,
@@ -192,7 +202,8 @@ var Room = class {
         mapId: this.mapId,
         mode: this.mode,
         players,
-        matchActive: this.matchActive
+        matchActive: this.matchActive,
+        fillBots: this.fillBots
       };
       this.send(client.ws, {
         type: "ROOM_STATE" /* ROOM_STATE */,
@@ -344,9 +355,10 @@ function handleMessage(playerId, ws, msg) {
       let targetRoomId = (payload.roomId || "").toUpperCase().trim();
       if (!targetRoomId) {
         targetRoomId = generateRoomCode();
-        const newRoom = new Room(targetRoomId, playerId, payload.mapId, payload.mode);
+        const fillBots = payload.fillBots !== void 0 ? payload.fillBots : true;
+        const newRoom = new Room(targetRoomId, playerId, payload.mapId, payload.mode, fillBots);
         rooms.set(targetRoomId, newRoom);
-        console.log(`[NET] Created new room ${targetRoomId} for host ${playerId}`);
+        console.log(`[NET] Created new room ${targetRoomId} for host ${playerId} (fillBots: ${fillBots})`);
       }
       const targetRoom = rooms.get(targetRoomId);
       if (!targetRoom) {
@@ -378,6 +390,12 @@ function handleMessage(playerId, ws, msg) {
         payload.rig,
         payload.weapon
       );
+      break;
+    }
+    case "TOGGLE_BOTS" /* TOGGLE_BOTS */: {
+      if (room && msg.payload) {
+        room.setFillBots(playerId, !!msg.payload.fillBots);
+      }
       break;
     }
     case "SET_READY" /* SET_READY */: {

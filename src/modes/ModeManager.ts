@@ -302,37 +302,39 @@ export class ModeManager {
       this.remoteControllers.set(np.id, controller);
     });
 
-    // 3. Fill remaining slots with Bots up to 6 players total
-    const neededBots = Math.max(0, 6 - this.players.length);
-    const botPool =
-      mapId === MapId.LAGOS_GOSLOW
-        ? [
-            { id: 'bot_sarki', name: 'Sarkin_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.RIFLE_XAG47 },
-            { id: 'bot_arewa', name: 'Arewa_Sniper', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.RAIL_SNIPER },
-            { id: 'bot_danauta', name: 'Dan_auta_234', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.AKIMBO_UZIS },
-            { id: 'bot_ghost', name: 'Ghost_Lagos', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.GHOST_SMG },
-            { id: 'bot_ekoviper', name: 'Eko_Viper', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12 },
-          ]
-        : [
-            { id: 'bot_sarki', name: 'Sarkin_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.RIFLE_XAG47 },
-            { id: 'bot_arewa', name: 'Arewa_Sniper', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.RAIL_SNIPER },
-            { id: 'bot_danauta', name: 'Dan_auta_234', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.AKIMBO_UZIS },
-            { id: 'bot_ghost', name: 'Ghost_Lagos', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.GHOST_SMG },
-            { id: 'bot_ekoviper', name: 'Eko_Viper', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12 },
-          ];
+    // 3. Fill remaining slots with Bots up to 6 players total ONLY if fillBots is enabled
+    if (fillBots) {
+      const neededBots = Math.max(0, 6 - this.players.length);
+      const botPool =
+        mapId === MapId.LAGOS_GOSLOW
+          ? [
+              { id: 'bot_sarki', name: 'Sarkin_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.RIFLE_XAG47 },
+              { id: 'bot_arewa', name: 'Arewa_Sniper', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.RAIL_SNIPER },
+              { id: 'bot_danauta', name: 'Dan_auta_234', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.AKIMBO_UZIS },
+              { id: 'bot_ghost', name: 'Ghost_Lagos', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.GHOST_SMG },
+              { id: 'bot_ekoviper', name: 'Eko_Viper', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12 },
+            ]
+          : [
+              { id: 'bot_sarki', name: 'Sarkin_Kano', rig: MovementRigType.BREACH_BOOSTER, weapon: WeaponId.RIFLE_XAG47 },
+              { id: 'bot_arewa', name: 'Arewa_Sniper', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.RAIL_SNIPER },
+              { id: 'bot_danauta', name: 'Dan_auta_234', rig: MovementRigType.OVERDRIVE_SLIDE, weapon: WeaponId.AKIMBO_UZIS },
+              { id: 'bot_ghost', name: 'Ghost_Lagos', rig: MovementRigType.PHASE_DASH, weapon: WeaponId.GHOST_SMG },
+              { id: 'bot_ekoviper', name: 'Eko_Viper', rig: MovementRigType.GLITCH_ANCHOR, weapon: WeaponId.SHOTGUN_AA12 },
+            ];
 
-    for (let i = 0; i < neededBots; i++) {
-      const cfg = botPool[i % botPool.length];
-      const sp = spawnPoints[spawnIdx % spawnPoints.length];
-      spawnIdx++;
-      const bot = new Player(this.scene, cfg.id, cfg.name, sp.x, sp.y, false, cfg.rig);
-      bot.stats.primaryWeapon = cfg.weapon;
-      bot.stats.activeWeapon = cfg.weapon;
-      bot.mesh.setWeapon(cfg.weapon);
-      this.players.push(bot);
+      for (let i = 0; i < neededBots; i++) {
+        const cfg = botPool[i % botPool.length];
+        const sp = spawnPoints[spawnIdx % spawnPoints.length];
+        spawnIdx++;
+        const bot = new Player(this.scene, cfg.id, cfg.name, sp.x, sp.y, false, cfg.rig);
+        bot.stats.primaryWeapon = cfg.weapon;
+        bot.stats.activeWeapon = cfg.weapon;
+        bot.mesh.setWeapon(cfg.weapon);
+        this.players.push(bot);
 
-      const ai = new BotAI(bot);
-      this.bots.push(ai);
+        const ai = new BotAI(bot);
+        this.bots.push(ai);
+      }
     }
 
     // 4. Initial Pickups

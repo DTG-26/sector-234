@@ -34,15 +34,23 @@ export class Room {
   public mapId: MapId;
   public mode: GameModeType;
   public matchActive: boolean = false;
+  public fillBots: boolean = true;
   private clients: Map<string, ConnectedClient> = new Map();
   private tickCount: number = 0;
   private snapshotInterval: any = null;
 
-  constructor(id: string, hostId: string, mapId: MapId = MapId.BIRNIN_KANO, mode: GameModeType = GameModeType.ODOGWU_STASH) {
+  constructor(
+    id: string,
+    hostId: string,
+    mapId: MapId = MapId.BIRNIN_KANO,
+    mode: GameModeType = GameModeType.ODOGWU_STASH,
+    fillBots: boolean = true
+  ) {
     this.id = id;
     this.hostId = hostId;
     this.mapId = mapId;
     this.mode = mode;
+    this.fillBots = fillBots;
   }
 
   public get playerCount(): number {
@@ -122,17 +130,26 @@ export class Room {
     }
   }
 
+  public setFillBots(hostId: string, fillBots: boolean): void {
+    if (this.hostId === hostId) {
+      this.fillBots = fillBots;
+      console.log(`[ROOM ${this.id}] Host toggled fillBots: ${this.fillBots}`);
+      this.broadcastRoomState();
+    }
+  }
+
   public startMatch(hostId: string): boolean {
     if (this.hostId !== hostId || this.matchActive) return false;
     this.matchActive = true;
 
-    console.log(`[ROOM ${this.id}] Match starting! Map: ${this.mapId}, Mode: ${this.mode}`);
+    console.log(`[ROOM ${this.id}] Match starting! Map: ${this.mapId}, Mode: ${this.mode}, Bots: ${this.fillBots}`);
 
     const payload: MatchStartingPayload = {
       countdownSec: 3,
       mapId: this.mapId,
       mode: this.mode,
       seed: Math.floor(Math.random() * 100000),
+      fillBots: this.fillBots,
     };
 
     this.broadcast({
@@ -259,6 +276,7 @@ export class Room {
         mode: this.mode,
         players,
         matchActive: this.matchActive,
+        fillBots: this.fillBots,
       };
 
       this.send(client.ws, {
