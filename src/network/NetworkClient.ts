@@ -54,10 +54,12 @@ export class NetworkClient {
     const envUrl = (import.meta as any).env?.VITE_WS_URL || (window as any).__XAG_WS_URL__;
     if (envUrl) {
       this.serverUrl = envUrl;
+    } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // In local dev, default to local port 8080 (falls back to Railway if local server is down)
+      this.serverUrl = 'ws://localhost:8080';
     } else {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.hostname || 'localhost';
-      this.serverUrl = `${protocol}//${host}:8080`;
+      // Production live cloud server on Railway
+      this.serverUrl = 'wss://sector-234-production.up.railway.app';
     }
   }
 
@@ -74,6 +76,11 @@ export class NetworkClient {
         this.ws = new WebSocket(this.serverUrl);
       } catch (e) {
         console.error('[NET-CLIENT] WebSocket instantiation failed:', e);
+        if (this.serverUrl !== 'wss://sector-234-production.up.railway.app') {
+          this.serverUrl = 'wss://sector-234-production.up.railway.app';
+          this.connect().then(resolve);
+          return;
+        }
         resolve(false);
         return;
       }
@@ -93,6 +100,13 @@ export class NetworkClient {
 
       this.ws.onerror = (err) => {
         console.error('[NET-CLIENT] WebSocket error:', err);
+        // If local dev server was not started, seamlessly switch to Railway cloud!
+        if (this.serverUrl.includes('localhost') && this.serverUrl !== 'wss://sector-234-production.up.railway.app') {
+          console.log('[NET-CLIENT] Local server unavailable. Seamlessly switching to live Railway cloud server...');
+          this.serverUrl = 'wss://sector-234-production.up.railway.app';
+          this.connect().then(resolve);
+          return;
+        }
         this.isConnected = false;
         resolve(false);
       };
