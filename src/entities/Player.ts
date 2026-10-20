@@ -28,6 +28,7 @@ export class Player {
   public reloadTimer: number = 0;
   public meleeTimer: number = 0;
   public healthRegenDelay: number = 0;
+  public c4RegenTimer: number = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -70,11 +71,11 @@ export class Player {
         [WeaponId.GHOST_SMG]: 32,
         [WeaponId.RICOCHET_SAW]: 10,
         [WeaponId.RAIL_SNIPER]: 4,
-        [WeaponId.BUNKER_RPG]: 1,
+        [WeaponId.BUNKER_RPG]: 2,
         [WeaponId.SHOCK_ARC]: 8,
         [WeaponId.VULCAN_MINIGUN]: 150,
       },
-      c4Count: 2,
+      c4Count: 4,
       empCount: 1,
       tearGasCount: 1,
       rigCooldownTimer: 0,
@@ -154,6 +155,8 @@ export class Player {
     this.healthRegenDelay = 0;
     this.stats.hp = this.stats.maxHp;
     this.stats.armor = this.stats.maxArmor;
+    this.stats.c4Count = 4;
+    this.c4RegenTimer = 0;
     this.jetFuel = this.maxJetFuel;
     this.mesh.isRagdoll = false;
     this.mesh.statusSprite.visible = true;
@@ -305,6 +308,17 @@ export class Player {
       if (Math.floor(prevHp) !== Math.floor(this.stats.hp)) {
         this.syncStatusBillboard();
       }
+    }
+
+    // Passive C4 Recharge: recovers +1 charge every 14.0s (up to max 4)
+    if (this.stats.c4Count < 4) {
+      this.c4RegenTimer += dt;
+      if (this.c4RegenTimer >= 14.0) {
+        this.stats.c4Count++;
+        this.c4RegenTimer = 0;
+      }
+    } else {
+      this.c4RegenTimer = 0;
     }
 
     // Cooldown timers

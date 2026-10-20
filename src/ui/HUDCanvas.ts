@@ -479,32 +479,40 @@ export class HUDCanvas {
     }
   }
 
-  private renderDeathScreen(ctx: CanvasRenderingContext2D, w: number, h: number, player: Player): void {
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
-    ctx.fillRect(0, 0, w, h);
+  private renderDeathScreen(ctx: CanvasRenderingContext2D, w: number, _h: number, player: Player): void {
+    // Subtle red perimeter casualty border (does NOT block the view of the match!)
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, w - 4, _h - 4);
 
     const secondsLeft = Math.max(0, Math.ceil(player.respawnTimer));
+    const pillW = 270;
+    const pillH = 30;
+    const pillX = w * 0.5 - pillW * 0.5;
+    const pillY = 48; // Positioned neatly beneath the top status plate
 
-    // Skull / Warning Alert
+    ctx.fillStyle = 'rgba(10, 16, 13, 0.92)';
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillW, pillH, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    // Red LED dot
     ctx.fillStyle = '#ef4444';
-    ctx.font = '900 24px "Chakra Petch", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 10;
-    ctx.fillText('CRITICAL CASUALTY — KIA', w * 0.5, h * 0.5 - 45);
-    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(pillX + 16, pillY + pillH * 0.5, 4, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Giant Dynamic Countdown
-    ctx.fillStyle = secondsLeft <= 1 ? '#ef4444' : '#f8fafc';
-    ctx.font = '900 68px "Chakra Petch", sans-serif';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 24;
-    ctx.fillText(secondsLeft > 0 ? `${secondsLeft}` : 'DEPLOYING...', w * 0.5, h * 0.5 + 22);
-    ctx.shadowBlur = 0;
-
-    // Tactical subtitle
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '700 13px "JetBrains Mono", monospace';
-    ctx.fillText('TACTICAL CLONING & RESUPPLY IN PROGRESS', w * 0.5, h * 0.5 + 64);
+    // Compact tactical respawn message
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '800 11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(
+      secondsLeft > 0 ? `[▲] ELIMINATED // RESPAWN: ${secondsLeft}s` : `[●] REDEPLOYING TO SECTOR...`,
+      pillX + 28,
+      pillY + 19
+    );
   }
 }

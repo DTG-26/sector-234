@@ -141,46 +141,43 @@ export class HypeAnnouncer {
     // 3. Render tactical cyber-stencil banner
     this.showBanner(item);
 
-    // 4. Dismiss banner after 2.8s and process next
+    // 4. Dismiss banner after 1.8s and process next
     setTimeout(() => {
       this.hideBanner();
       setTimeout(() => {
         this.processQueue();
-      }, 250);
-    }, 2800);
+      }, 200);
+    }, 1800);
   }
 
   private showBanner(item: AnnouncementItem): void {
     this.bannerContainer.innerHTML = `
       <div style="
-        min-width: 310px;
-        max-width: 90vw;
-        background: rgba(11, 15, 25, 0.94);
-        border: 2px solid ${item.color};
-        box-shadow: 0 0 35px ${item.color}55, inset 0 0 15px rgba(0,0,0,0.8);
-        border-radius: 6px;
-        padding: 8px 22px;
+        max-width: 290px;
+        background: rgba(5, 8, 6, 0.94);
+        border: 1px solid ${item.color};
+        box-shadow: 0 4px 18px rgba(0,0,0,0.7);
+        border-radius: 4px;
+        padding: 5px 14px;
         text-align: center;
-        backdrop-filter: blur(8px);
-        font-family: 'JetBrains Mono', monospace;
+        backdrop-filter: blur(6px);
+        font-family: 'JetBrains Mono', 'Chakra Petch', monospace;
       ">
         <div style="
           color: ${item.color};
-          font-size: 20px;
+          font-size: 11px;
           font-weight: 900;
-          letter-spacing: 3px;
-          text-shadow: 0 0 12px ${item.color};
+          letter-spacing: 1.5px;
           line-height: 1.2;
         ">
           ${item.bannerTitle}
         </div>
         <div style="
-          color: #e2e8f0;
-          font-size: 10px;
+          color: #94a3b8;
+          font-size: 9px;
           font-weight: 700;
-          letter-spacing: 1.5px;
-          margin-top: 3px;
-          opacity: 0.9;
+          letter-spacing: 0.8px;
+          margin-top: 1px;
         ">
           ${item.bannerSubtitle}
         </div>
@@ -250,28 +247,12 @@ export class HypeAnnouncer {
     }
   }
 
-  private playVoiceLine(text: string): void {
-    if (!('speechSynthesis' in window)) return;
-
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.pitch = 0.85;
-      utterance.rate = 1.15;
-      utterance.volume = 1.0;
-
-      // Select natural English voice if present
-      const voices = window.speechSynthesis.getVoices();
-      if (voices && voices.length > 0) {
-        const preferred = voices.find((v) => v.lang.startsWith('en') && (v.name.includes('Male') || v.name.includes('David') || v.name.includes('Daniel')));
-        if (preferred) {
-          utterance.voice = preferred;
-        }
-      }
-
-      window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.warn('[HypeAnnouncer] Speech synthesis error:', e);
+  private playVoiceLine(_text: string): void {
+    // AI speech synthesis completely removed per user request
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_) {}
     }
   }
 }

@@ -39,9 +39,9 @@ export class Throwable3D {
     this.type = type;
     this.ownerId = ownerId;
 
-    const speed = 16.0;
+    const speed = 28.0;
     this.vx = Math.cos(throwAngle) * speed;
-    this.vy = Math.sin(throwAngle) * speed + 3.0;
+    this.vy = Math.sin(throwAngle) * speed + 6.5;
 
     // Mesh
     const mat = type === 'c4' ? Throwable3D.c4Mat! : (type === 'emp' ? Throwable3D.empMat! : Throwable3D.teargasMat!);
@@ -59,12 +59,12 @@ export class Throwable3D {
     if (this.isDetonated) return;
     this.timer += dt;
 
-    // Blink LED every 0.3s
-    const blink = Math.sin(this.timer * 12.0) > 0;
-    this.ledLight.intensity = blink ? 3.0 : 0.2;
+    // Blink LED every 0.2s
+    const blink = Math.sin(this.timer * 16.0) > 0;
+    this.ledLight.intensity = blink ? 3.5 : 0.2;
 
     if (!this.isStuck) {
-      this.vy += -32.0 * dt; // gravity
+      this.vy += -24.0 * dt; // tuned ballistic arc
       this.mesh.position.x += this.vx * dt;
       this.mesh.position.y += this.vy * dt;
       this.mesh.rotation.z += dt * 6.0;
@@ -84,7 +84,10 @@ export class Throwable3D {
   public detonate(
     tileMap: TileMap3D,
     players: Player[],
-    onExplosionSound: () => void
+    onExplosionSound: () => void,
+    attacker?: Player,
+    onVaultHit?: (damage: number) => void,
+    onPlayerKilled?: (victim: Player, killer?: Player) => void
   ): void {
     if (this.isDetonated) return;
     this.isDetonated = true;
@@ -94,28 +97,36 @@ export class Throwable3D {
     const posY = this.mesh.position.y;
 
     if (this.type === 'c4') {
-      // Destroys 3x3 block radius of brick/concrete
+      // Breaches a devastating 5x5 block area of brick/concrete
       const centerTx = Math.floor(posX);
       const centerTy = Math.floor(posY);
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
           tileMap.destroyTile(centerTx + dx, centerTy + dy);
         }
       }
 
-      // Damage nearby players (140 DMG max falloff)
+      // Check Vault breach damage (450 DMG within 6.5m)
+      if (onVaultHit && Math.hypot(posX - 40, posY - 3.5) < 6.5) {
+        onVaultHit(450);
+      }
+
+      // Heavy combat damage to nearby players (240 DMG max falloff over 10m radius)
       players.forEach((p) => {
         const dist = p.actor.position.distanceTo(this.mesh.position);
-        if (dist < 6.5) {
-          const dmg = Math.round(140 * (1 - dist / 6.5));
-          p.takeDamage(dmg);
+        if (dist < 10.0) {
+          const dmg = Math.round(240 * (1 - dist / 10.0));
+          const died = p.takeDamage(dmg, attacker);
+          if (died && onPlayerKilled) {
+            onPlayerKilled(p, attacker);
+          }
         }
       });
     } else if (this.type === 'emp') {
       // Disables movement rigs for 8s
       players.forEach((p) => {
         const dist = p.actor.position.distanceTo(this.mesh.position);
-        if (dist < 6.0) {
+        if (dist < 8.0) {
           p.stats.rigCooldownTimer = 8.0;
         }
       });

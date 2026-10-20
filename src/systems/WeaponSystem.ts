@@ -3,7 +3,7 @@ import { Player } from '../entities/Player';
 import { Projectile3D } from '../entities/Projectile3D';
 import { Throwable3D } from '../entities/Throwable3D';
 import { WEAPON_REGISTRY } from '../config/constants';
-import { WeaponId } from '../config/types';
+import { TileType, WeaponId } from '../config/types';
 import { TileMap3D } from '../world/TileMap3D';
 import { ParticleSystem3D } from './ParticleSystem3D';
 import { AudioSynth } from '../core/AudioSynth';
@@ -93,13 +93,30 @@ export class WeaponSystem {
     return true;
   }
 
-  public handleThrowable(player: Player, aimAngle: number, tileMap: TileMap3D, allPlayers: Player[]): void {
+  public handleThrowable(
+    player: Player,
+    aimAngle: number,
+    tileMap: TileMap3D,
+    allPlayers: Player[],
+    onPlayerKilled?: (victim: Player, killer?: Player) => void
+  ): void {
     const activeC4 = this.throwables.find((t) => t.ownerId === player.stats.id && t.type === 'c4' && !t.isDetonated);
     if (activeC4) {
-      activeC4.detonate(tileMap, allPlayers, () => {
-        this.audio.playExplosion();
-        this.particles.spawnExplosionShockwave(activeC4.mesh.position.x, activeC4.mesh.position.y);
-      });
+      activeC4.detonate(
+        tileMap,
+        allPlayers,
+        () => {
+          this.audio.playExplosion();
+          this.particles.spawnExplosionShockwave(activeC4.mesh.position.x, activeC4.mesh.position.y);
+          tileMap.spawnDebrisBurst(activeC4.mesh.position.x, activeC4.mesh.position.y, TileType.BRICK_CONCRETE);
+          if (this.onDamageDealt) {
+            this.onDamageDealt(activeC4.mesh.position.x, activeC4.mesh.position.y + 1.5, 'C4 DETONATED! 💥', '#ef4444');
+          }
+        },
+        player,
+        this.onVaultHit,
+        onPlayerKilled
+      );
       return;
     }
 
@@ -126,6 +143,20 @@ export class WeaponSystem {
   ): void {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const proj = this.projectiles[i];
+
+      // Check central vault direct bullet hit first (4.5m radius covers entire 5.2m vault door)
+      if (this.onVaultHit && !proj.isDead) {
+        const distVault = Math.hypot(proj.mesh.position.x - 40, proj.mesh.position.y - 3.5);
+        if (distVault < 4.5) {
+          const vDmg = proj.weaponDef.damage * proj.weaponDef.wallDmgMultiplier;
+          this.onVaultHit(vDmg);
+          this.particles.spawnSparks(proj.mesh.position.x, proj.mesh.position.y, -proj.vx, -proj.vy, 8);
+          proj.isDead = true;
+          if (this.onDamageDealt) {
+            this.onDamageDealt(40, 5.0, `VAULT -${Math.round(vDmg)}`, '#f59e0b');
+          }
+        }
+      }
 
       proj.update(
         dt,
@@ -169,12 +200,12 @@ export class WeaponSystem {
         (x, y) => {
           this.audio.playExplosion();
           this.particles.spawnExplosionShockwave(x, y);
-          tileMap.spawnDebrisBurst(x, y, 3);
+          tileMap.spawnDebrisBurst(x, y, TileType.BRICK_CONCRETE);
 
-          if (this.onVaultHit && Math.hypot(x - 40, y - 3.5) < 5.0) {
-            this.onVaultHit(350);
+          if (this.onVaultHit && Math.hypot(x - 40, y - 3.5) < 7.0) {
+            this.onVaultHit(400);
             if (this.onDamageDealt) {
-              this.onDamageDealt(40, 5.5, 'VAULT BLAST -350!', '#f97316');
+              this.onDamageDealt(40, 5.5, 'VAULT BLAST -400!', '#f97316');
             }
           }
 
@@ -191,20 +222,6 @@ export class WeaponSystem {
           });
         }
       );
-
-      // Check central vault direct bullet hit
-      if (this.onVaultHit && !proj.isDead) {
-        const distVault = Math.hypot(proj.mesh.position.x - 40, proj.mesh.position.y - 3.5);
-        if (distVault < 2.8) {
-          const vDmg = proj.weaponDef.damage * proj.weaponDef.wallDmgMultiplier;
-          this.onVaultHit(vDmg);
-          this.particles.spawnSparks(proj.mesh.position.x, proj.mesh.position.y, -proj.vx, -proj.vy, 8);
-          proj.isDead = true;
-          if (this.onDamageDealt) {
-            this.onDamageDealt(40, 5.0, `VAULT -${Math.round(vDmg)}`, '#f59e0b');
-          }
-        }
-      }
 
       if (proj.isDead) {
         proj.destroy(this.scene);

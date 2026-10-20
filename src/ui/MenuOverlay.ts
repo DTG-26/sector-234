@@ -10,6 +10,7 @@ export interface MenuStartOptions {
   modeType: GameModeType;
   mapId: MapId;
   primaryWeapon?: WeaponId;
+  secondaryWeapon?: WeaponId;
 }
 
 const WEAPON_CYCLE: WeaponId[] = [
@@ -35,6 +36,7 @@ export class MenuOverlay {
   private selectedMode: GameModeType = GameModeType.ODOGWU_STASH;
   private selectedMap: MapId = MapId.BIRNIN_KANO;
   private selectedWeapon: WeaponId = WeaponId.RIFLE_XAG47;
+  private selectedSecondaryWeapon: WeaponId = WeaponId.SHOTGUN_AA12;
 
   private radarAnimId: number | null = null;
 
@@ -69,6 +71,7 @@ export class MenuOverlay {
     }
 
     const currentWeaponDef = WEAPON_REGISTRY[this.selectedWeapon] || WEAPON_REGISTRY[WeaponId.RIFLE_XAG47];
+    const currentSecWeaponDef = WEAPON_REGISTRY[this.selectedSecondaryWeapon] || WEAPON_REGISTRY[WeaponId.SHOTGUN_AA12];
 
     this.container.innerHTML = `
       <style>
@@ -690,6 +693,51 @@ export class MenuOverlay {
               </div>
             </div>
 
+            <!-- Loadout Secondary Weapon -->
+            <div class="xag-section-label" style="margin-top: 6px;">
+              <span>LOADOUT SECONDARY:</span>
+              <span id="sec-weapon-cat-label" style="color: #22c55e; font-weight: 800;">${currentSecWeaponDef.category.toUpperCase()}</span>
+            </div>
+            <div id="sec-weapon-select-card" class="xag-weapon-card">
+              <div class="xag-weapon-head">
+                <span id="sec-weapon-name-display" class="xag-weapon-name">${currentSecWeaponDef.name.toUpperCase()}</span>
+                <button id="btn-cycle-sec-weapon" class="xag-cycle-btn">[//] SWAP</button>
+              </div>
+              <div style="font-size: 10px; color: #9ca3af; line-height: 1.3;" id="sec-weapon-desc-display">
+                ${currentSecWeaponDef.description}
+              </div>
+              <div class="xag-weapon-stats">
+                <div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span>DMG</span>
+                    <span id="sec-stat-dmg-val" style="color: #ffffff; font-weight: 800;">${currentSecWeaponDef.damage}</span>
+                  </div>
+                  <div class="xag-stat-bar-bg"><div id="sec-stat-dmg-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentSecWeaponDef.damage / 180) * 100)}%;"></div></div>
+                </div>
+                <div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span>ROF</span>
+                    <span id="sec-stat-rof-val" style="color: #ffffff; font-weight: 800;">${Math.round(60 / currentSecWeaponDef.fireInterval)}</span>
+                  </div>
+                  <div class="xag-stat-bar-bg"><div id="sec-stat-rof-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (0.4 / Math.max(0.06, currentSecWeaponDef.fireInterval)) * 100)}%;"></div></div>
+                </div>
+                <div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span>RNG</span>
+                    <span id="sec-stat-rng-val" style="color: #ffffff; font-weight: 800;">${currentSecWeaponDef.range}m</span>
+                  </div>
+                  <div class="xag-stat-bar-bg"><div id="sec-stat-rng-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentSecWeaponDef.range / 45) * 100)}%;"></div></div>
+                </div>
+                <div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span>MAG</span>
+                    <span id="sec-stat-mag-val" style="color: #ffffff; font-weight: 800;">${currentSecWeaponDef.magSize}</span>
+                  </div>
+                  <div class="xag-stat-bar-bg"><div id="sec-stat-mag-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentSecWeaponDef.magSize / 120) * 100)}%;"></div></div>
+                </div>
+              </div>
+            </div>
+
             <!-- Open Bank & Armory -->
             <button id="btn-open-dossier" class="xag-armory-btn">
               <span class="xag-armory-icon">[+]</span>
@@ -884,6 +932,48 @@ export class MenuOverlay {
     if (weaponCard) weaponCard.addEventListener('click', cycleWeapon);
     if (cycleBtn) cycleBtn.addEventListener('click', cycleWeapon);
 
+    // 2b. Hook Weapon Secondary Switcher
+    const updateSecWeaponDisplay = () => {
+      const def = WEAPON_REGISTRY[this.selectedSecondaryWeapon] || WEAPON_REGISTRY[WeaponId.SHOTGUN_AA12];
+      const nameEl = document.getElementById('sec-weapon-name-display');
+      const catEl = document.getElementById('sec-weapon-cat-label');
+      const descEl = document.getElementById('sec-weapon-desc-display');
+      const dmgVal = document.getElementById('sec-stat-dmg-val');
+      const dmgBar = document.getElementById('sec-stat-dmg-bar');
+      const rofVal = document.getElementById('sec-stat-rof-val');
+      const rofBar = document.getElementById('sec-stat-rof-bar');
+      const rngVal = document.getElementById('sec-stat-rng-val');
+      const rngBar = document.getElementById('sec-stat-rng-bar');
+      const magVal = document.getElementById('sec-stat-mag-val');
+      const magBar = document.getElementById('sec-stat-mag-bar');
+
+      if (nameEl) nameEl.innerText = def.name.toUpperCase();
+      if (catEl) catEl.innerText = def.category.toUpperCase();
+      if (descEl) descEl.innerText = def.description;
+      if (dmgVal) dmgVal.innerText = `${def.damage}`;
+      if (dmgBar) dmgBar.style.width = `${Math.min(100, (def.damage / 180) * 100)}%`;
+      if (rofVal) rofVal.innerText = `${Math.round(60 / def.fireInterval)}`;
+      if (rofBar) rofBar.style.width = `${Math.min(100, (0.4 / Math.max(0.06, def.fireInterval)) * 100)}%`;
+      if (rngVal) rngVal.innerText = `${def.range}m`;
+      if (rngBar) rngBar.style.width = `${Math.min(100, (def.range / 45) * 100)}%`;
+      if (magVal) magVal.innerText = `${def.magSize}`;
+      if (magBar) magBar.style.width = `${Math.min(100, (def.magSize / 120) * 100)}%`;
+    };
+
+    const cycleSecWeapon = (e: Event) => {
+      e.stopPropagation();
+      const idx = WEAPON_CYCLE.indexOf(this.selectedSecondaryWeapon);
+      const nextIdx = (idx + 1) % WEAPON_CYCLE.length;
+      this.selectedSecondaryWeapon = WEAPON_CYCLE[nextIdx];
+      updateSecWeaponDisplay();
+      this.audio?.playUISelect();
+    };
+
+    const secWeaponCard = document.getElementById('sec-weapon-select-card');
+    const secCycleBtn = document.getElementById('btn-cycle-sec-weapon');
+    if (secWeaponCard) secWeaponCard.addEventListener('click', cycleSecWeapon);
+    if (secCycleBtn) secCycleBtn.addEventListener('click', cycleSecWeapon);
+
     // 3. Hook Maps
     const mapCards = this.container.querySelectorAll('.xag-map-card');
     mapCards.forEach((card) => {
@@ -991,6 +1081,7 @@ export class MenuOverlay {
           modeType: this.selectedMode,
           mapId: this.selectedMap,
           primaryWeapon: this.selectedWeapon,
+          secondaryWeapon: this.selectedSecondaryWeapon,
         });
       }
     };

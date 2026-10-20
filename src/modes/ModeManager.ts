@@ -11,6 +11,7 @@ import { TileMap3D } from '../world/TileMap3D';
 import { WeaponSystem } from '../systems/WeaponSystem';
 import { RigSystem } from '../systems/RigSystem';
 import { ParticleSystem3D } from '../systems/ParticleSystem3D';
+import { WEAPON_REGISTRY } from '../config/constants';
 
 export class ModeManager {
   public currentMode: GameModeType = GameModeType.ODOGWU_STASH;
@@ -82,11 +83,9 @@ export class ModeManager {
     this.currentMap = mapId;
     this.isMatchOver = false;
 
-    // Initialize the flagship 3-Act Heist Mode Manager
-    if (modeType === GameModeType.ODOGWU_STASH) {
+    // Initialize the flagship 3-Act Heist Mode Manager for all Heist operations
+    if (modeType === GameModeType.ODOGWU_STASH || modeType === GameModeType.VAULT_HEIST) {
       this.heistMode = new HeistModeManager(this.scene, mapId);
-    } else if (modeType === GameModeType.VAULT_HEIST) {
-      this.vaultMode = new VaultHeistMode(this.scene);
     } else {
       this.apapaMode = new ApapaLockdownMode(this.scene);
     }
@@ -134,37 +133,46 @@ export class ModeManager {
       this.bots.push(ai);
     });
 
-    // 3. Spawn Initial Map Cash Bundles (₦) & Weapon Crates
+    // 3. Spawn Initial Map Cash Bundles (₦), Weapon Crates, and Respawning Medkits
     const initialPickups =
       mapId === MapId.LAGOS_GOSLOW
         ? [
-            { x: 8, y: 6.5, type: 'cash' as const }, // Danfo bus 1 roof
-            { x: 22, y: 6.5, type: 'cash' as const }, // Danfo bus 3 roof
-            { x: 38, y: 22.5, type: 'cash' as const }, // Flyover bridge
-            { x: 54, y: 6.5, type: 'cash' as const }, // Danfo bus 6 roof
-            { x: 70, y: 6.5, type: 'cash' as const }, // Danfo bus 8 roof
-            { x: 14, y: 28.5, type: 'cash' as const }, // Commercial roof
-            { x: 26, y: 22.5, type: 'weapon' as const, wId: WeaponId.SHOTGUN_AA12 },
-            { x: 50, y: 22.5, type: 'weapon' as const, wId: WeaponId.BUNKER_RPG },
-            { x: 44, y: 15.5, type: 'health' as const }, // Lagos flyover health station
-            { x: 12, y: 8.5, type: 'health' as const },  // Street level medkit
+            { x: 8, y: 6.5, type: 'cash' as const, respawn: false }, // Danfo bus 1 roof
+            { x: 22, y: 6.5, type: 'cash' as const, respawn: false }, // Danfo bus 3 roof
+            { x: 38, y: 22.5, type: 'cash' as const, respawn: false }, // Flyover bridge
+            { x: 54, y: 6.5, type: 'cash' as const, respawn: false }, // Danfo bus 6 roof
+            { x: 70, y: 6.5, type: 'cash' as const, respawn: false }, // Danfo bus 8 roof
+            { x: 14, y: 28.5, type: 'cash' as const, respawn: false }, // Commercial roof
+            { x: 26, y: 22.5, type: 'weapon' as const, wId: WeaponId.SHOTGUN_AA12, respawn: true },
+            { x: 50, y: 22.5, type: 'weapon' as const, wId: WeaponId.BUNKER_RPG, respawn: true },
+            // Grounded respawning medkits across Lagos
+            { x: 12, y: 3.5, type: 'health' as const, respawn: true },  // Expressway street level
+            { x: 64, y: 3.5, type: 'health' as const, respawn: true },  // East expressway ground
+            { x: 28, y: 7.5, type: 'health' as const, respawn: true },  // Danfo bus roof
+            { x: 44, y: 22.5, type: 'health' as const, respawn: true }, // 3rd Mainland flyover deck
+            { x: 16, y: 29.5, type: 'health' as const, respawn: true }, // Commercial rooftop
           ]
         : [
-            { x: 10, y: 13.5, type: 'cash' as const }, // Left Mud compound roof
-            { x: 25, y: 3.5, type: 'cash' as const }, // Earthen street
-            { x: 24, y: 17.5, type: 'cash' as const }, // Timber bridge
-            { x: 40, y: 17.5, type: 'cash' as const }, // Center terrace
-            { x: 55, y: 17.5, type: 'cash' as const }, // Right bridge
-            { x: 65, y: 3.5, type: 'cash' as const }, // Right street
-            { x: 40, y: 27.5, type: 'cash' as const }, // High terrace
-            { x: 18, y: 13.5, type: 'weapon' as const, wId: WeaponId.BUNKER_RPG },
-            { x: 62, y: 25.5, type: 'weapon' as const, wId: WeaponId.VULCAN_MINIGUN },
-            { x: 40, y: 8.5, type: 'health' as const },  // Center shrine medkit
-            { x: 72, y: 18.5, type: 'health' as const }, // High gate health station
+            { x: 10, y: 13.5, type: 'cash' as const, respawn: false }, // Left Mud compound roof
+            { x: 25, y: 3.5, type: 'cash' as const, respawn: false }, // Earthen street
+            { x: 24, y: 17.5, type: 'cash' as const, respawn: false }, // Timber bridge
+            { x: 40, y: 17.5, type: 'cash' as const, respawn: false }, // Center terrace
+            { x: 55, y: 17.5, type: 'cash' as const, respawn: false }, // Right bridge
+            { x: 65, y: 3.5, type: 'cash' as const, respawn: false }, // Right street
+            { x: 40, y: 27.5, type: 'cash' as const, respawn: false }, // High terrace
+            { x: 18, y: 13.5, type: 'weapon' as const, wId: WeaponId.BUNKER_RPG, respawn: true },
+            { x: 62, y: 25.5, type: 'weapon' as const, wId: WeaponId.VULCAN_MINIGUN, respawn: true },
+            // Grounded respawning medkits on actual solid platforms across Kano
+            { x: 14, y: 3.5, type: 'health' as const, respawn: true },  // West street runway
+            { x: 66, y: 3.5, type: 'health' as const, respawn: true },  // East street runway
+            { x: 10, y: 13.5, type: 'health' as const, respawn: true }, // Left mud compound rooftop
+            { x: 40, y: 17.5, type: 'health' as const, respawn: true }, // Central grand palace deck
+            { x: 64, y: 14.5, type: 'health' as const, respawn: true }, // East Dala fortress lower bastion
+            { x: 40, y: 27.5, type: 'health' as const, respawn: true }, // Upper palace terrace
           ];
 
     initialPickups.forEach((p) => {
-      const pk = new Pickup3D(this.scene, p.type, p.x, p.y, 25000, p.wId);
+      const pk = new Pickup3D(this.scene, p.type, p.x, p.y, 25000, p.wId, p.respawn);
       this.pickups.push(pk);
     });
 
@@ -220,20 +228,32 @@ export class ModeManager {
       if (pk.isCollected) continue;
 
       const dist = player.actor.position.distanceTo(pk.mesh.position);
-      if (dist < 1.8) {
-        pk.isCollected = true;
-        pk.destroy(this.scene);
-
-        if (pk.type === 'cash') {
+      if (dist < 2.0) {
+        if (pk.type === 'health') {
+          // If already at full HP, preserve the medkit
+          if (player.stats.hp >= player.stats.maxHp) continue;
+          player.heal(50);
+          pk.isCollected = true;
+          pk.mesh.visible = false;
+          pk.respawnTimer = 20.0; // 20s respawn timer
+          onAudioChime();
+        } else if (pk.type === 'cash') {
+          pk.isCollected = true;
           player.stats.cash += pk.value;
+          pk.destroy(this.scene);
           onAudioChime();
         } else if (pk.type === 'weapon' && pk.weaponId) {
-          player.stats.primaryWeapon = pk.weaponId;
-          player.stats.activeWeapon = pk.weaponId;
-          player.mesh.setWeapon(pk.weaponId);
-          onAudioChime();
-        } else if (pk.type === 'health') {
-          player.heal(50);
+          // Tactical crate: refills active ammo to full and awards ₦15,000 without destroying chosen guns
+          pk.isCollected = true;
+          pk.mesh.visible = false;
+          pk.respawnTimer = 25.0; // 25s respawn timer
+          const activeW = player.stats.activeWeapon;
+          const def = WEAPON_REGISTRY[activeW];
+          if (def) {
+            player.stats.ammo[activeW] = def.magSize;
+            player.reloadTimer = 0;
+          }
+          player.stats.cash += 15000;
           onAudioChime();
         }
       }
@@ -273,11 +293,11 @@ export class ModeManager {
       }
     }
 
-    // 2. Update Pickups
+    // 2. Update Pickups & Respawn Cycles
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       const pk = this.pickups[i];
       pk.update(dt);
-      if (pk.isCollected) {
+      if (pk.isCollected && !pk.canRespawn) {
         this.pickups.splice(i, 1);
       }
     }

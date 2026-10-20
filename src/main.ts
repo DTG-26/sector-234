@@ -91,10 +91,15 @@ const startMatch = (opts: MenuStartOptions) => {
   }
 
   localPlayer = modeManager.initMatch(opts.modeType, opts.gamerTag, opts.rigType, opts.mapId);
-  if (opts.primaryWeapon && localPlayer) {
-    localPlayer.stats.primaryWeapon = opts.primaryWeapon;
-    localPlayer.stats.activeWeapon = opts.primaryWeapon;
-    localPlayer.mesh.setWeapon(opts.primaryWeapon);
+  if (localPlayer) {
+    if (opts.primaryWeapon) {
+      localPlayer.stats.primaryWeapon = opts.primaryWeapon;
+      localPlayer.stats.activeWeapon = opts.primaryWeapon;
+      localPlayer.mesh.setWeapon(opts.primaryWeapon);
+    }
+    if (opts.secondaryWeapon) {
+      localPlayer.stats.secondaryWeapon = opts.secondaryWeapon;
+    }
   }
   isGameActive = true;
 };
@@ -232,6 +237,17 @@ engine.onUpdate((dt: number) => {
           modeManager.handlePlayerElimination(target, playerRef);
         }
       });
+
+      // Check if Cutlass lunge hits Central Vault door (4.8m radius)
+      const distVault = Math.hypot(localPlayer.actor.position.x - 40, localPlayer.actor.position.y - 3.5);
+      if (distVault < 4.8 && weaponSystem.onVaultHit) {
+        weaponSystem.onVaultHit(150);
+        audio.playGunshot('saw');
+        particles.spawnSparks(40, 3.5, 0, 1, 15);
+        hud.addDamagePopup(40, 5.0, 'VAULT MELEE BREACH -150!', '#f59e0b', 22);
+        engine.cameraSystem.addTrauma(0.12);
+      }
+
       audio.playMeleeSwish();
     }
 
@@ -250,7 +266,13 @@ engine.onUpdate((dt: number) => {
 
     // Throwables (Remote C4)
     if (input.state.throwBoom) {
-      weaponSystem.handleThrowable(localPlayer, effectiveAimAngle, tileMap, modeManager.players);
+      weaponSystem.handleThrowable(
+        localPlayer,
+        effectiveAimAngle,
+        tileMap,
+        modeManager.players,
+        (victim, killer) => modeManager.handlePlayerElimination(victim, killer)
+      );
     }
 
     // Weapon Swap & Reload

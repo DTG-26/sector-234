@@ -7,12 +7,23 @@ export class Pickup3D {
   public value: number;
   public weaponId?: WeaponId;
   public isCollected: boolean = false;
+  public canRespawn: boolean = false;
+  public respawnTimer: number = 0;
   private floatTime: number = Math.random() * Math.PI * 2;
 
-  constructor(scene: THREE.Scene, type: 'cash' | 'weapon' | 'health', x: number, y: number, value: number = 25000, weaponId?: WeaponId) {
+  constructor(
+    scene: THREE.Scene,
+    type: 'cash' | 'weapon' | 'health',
+    x: number,
+    y: number,
+    value: number = 25000,
+    weaponId?: WeaponId,
+    canRespawn: boolean = false
+  ) {
     this.type = type;
     this.value = value;
     this.weaponId = weaponId;
+    this.canRespawn = canRespawn;
     this.mesh = new THREE.Group();
     this.mesh.position.set(x, y, 0);
     scene.add(this.mesh);
@@ -129,7 +140,16 @@ export class Pickup3D {
   }
 
   public update(dt: number): void {
-    if (this.isCollected) return;
+    if (this.isCollected) {
+      if (this.canRespawn && this.respawnTimer > 0) {
+        this.respawnTimer -= dt;
+        if (this.respawnTimer <= 0) {
+          this.isCollected = false;
+          this.mesh.visible = true;
+        }
+      }
+      return;
+    }
     this.floatTime += dt * 3.0;
     this.mesh.rotation.y += dt * 2.2;
     this.mesh.position.y += Math.sin(this.floatTime) * dt * 0.4;
