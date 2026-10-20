@@ -72,27 +72,23 @@ export class MenuOverlay {
 
     this.container.innerHTML = `
       <style>
-        @keyframes radarSweep {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+        @keyframes pulseMilitaryLed {
+          0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 6px #22c55e); }
+          50% { opacity: 0.35; transform: scale(0.85); filter: drop-shadow(0 0 2px #22c55e); }
         }
-        @keyframes pulseLed {
-          0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 6px #10b981); }
-          50% { opacity: 0.4; transform: scale(0.85); filter: drop-shadow(0 0 2px #10b981); }
-        }
-        @keyframes deployGlow {
-          0%, 100% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.45), inset 0 0 15px rgba(255, 255, 255, 0.2); }
-          50% { box-shadow: 0 0 45px rgba(245, 158, 11, 0.8), inset 0 0 25px rgba(255, 255, 255, 0.35); }
-        }
-        @keyframes scanlineMove {
-          0% { background-position: 0 0; }
-          100% { background-position: 0 100%; }
+        @keyframes deployHazardGlow {
+          0%, 100% { box-shadow: 0 0 25px rgba(0, 135, 81, 0.5), inset 0 0 15px rgba(34, 197, 94, 0.3); }
+          50% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.8), inset 0 0 25px rgba(255, 255, 255, 0.3); }
         }
 
         .xag-war-room {
           position: absolute;
           inset: 0;
-          background: radial-gradient(circle at 50% 20%, #111420 0%, #07080c 100%);
+          background: #050806;
+          background-image: 
+            linear-gradient(rgba(0, 135, 81, 0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 135, 81, 0.07) 1px, transparent 1px);
+          background-size: 32px 32px;
           display: flex;
           flex-direction: column;
           z-index: 100;
@@ -110,12 +106,12 @@ export class MenuOverlay {
           content: '';
           position: absolute;
           inset: 0;
-          background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.15) 0px, rgba(0, 0, 0, 0.15) 1px, transparent 1px, transparent 2px);
+          background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0px, rgba(0, 0, 0, 0.22) 1px, transparent 1px, transparent 2px);
           pointer-events: none;
           z-index: 1;
         }
 
-        /* Top Bar */
+        /* Top Status Bar */
         .xag-top-bar {
           position: relative;
           z-index: 2;
@@ -123,11 +119,10 @@ export class MenuOverlay {
           justify-content: space-between;
           align-items: center;
           padding: 8px 16px;
-          background: rgba(15, 19, 28, 0.85);
-          backdrop-filter: blur(12px);
-          border: 1px solid rgba(245, 158, 11, 0.3);
+          background: #0a100d;
+          border: 1px solid #1c2b22;
           border-radius: 4px;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+          box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
           margin-bottom: 12px;
           flex-shrink: 0;
         }
@@ -138,66 +133,68 @@ export class MenuOverlay {
           gap: 10px;
         }
         .xag-badge {
-          background: #f59e0b;
-          color: #07080c;
+          background: #008751;
+          color: #ffffff;
           font-weight: 900;
           font-size: 11px;
-          padding: 2px 7px;
+          padding: 3px 8px;
           border-radius: 2px;
           letter-spacing: 1.5px;
+          border: 1px solid rgba(255, 255, 255, 0.2);
         }
         .xag-title {
           font-family: 'Chakra Petch', sans-serif;
           font-weight: 900;
           font-size: 18px;
           letter-spacing: 2px;
-          color: #f4f4f5;
+          color: #ffffff;
         }
         .xag-sub {
           font-size: 10px;
-          color: #71717a;
+          color: #22c55e;
           letter-spacing: 1px;
+          font-weight: 700;
         }
 
         .xag-net-status {
           display: flex;
           align-items: center;
           gap: 8px;
-          background: rgba(16, 185, 129, 0.1);
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          padding: 4px 12px;
+          background: rgba(0, 135, 81, 0.12);
+          border: 1px solid rgba(34, 197, 94, 0.35);
+          padding: 5px 14px;
           border-radius: 3px;
           font-size: 11px;
-          color: #10b981;
-          font-weight: 700;
+          color: #22c55e;
+          font-weight: 800;
           letter-spacing: 1px;
         }
         .xag-net-led {
           width: 8px;
           height: 8px;
           border-radius: 50%;
-          background: #10b981;
-          animation: pulseLed 1.6s infinite ease-in-out;
+          background: #22c55e;
+          animation: pulseMilitaryLed 1.8s infinite ease-in-out;
         }
 
         .xag-vault-badge {
           display: flex;
           align-items: center;
           gap: 10px;
-          background: rgba(245, 158, 11, 0.1);
-          border: 1px solid rgba(245, 158, 11, 0.4);
-          padding: 4px 12px;
+          background: rgba(10, 16, 13, 0.85);
+          border: 1px solid #1c2b22;
+          padding: 5px 14px;
           border-radius: 3px;
           cursor: pointer;
           transition: 0.15s;
         }
         .xag-vault-badge:hover {
-          background: rgba(245, 158, 11, 0.2);
-          border-color: #f59e0b;
+          background: rgba(0, 135, 81, 0.2);
+          border-color: #22c55e;
           transform: translateY(-1px);
         }
         .xag-vault-val {
-          color: #10b981;
+          color: #22c55e;
           font-size: 14px;
           font-weight: 900;
           letter-spacing: 1px;
@@ -216,23 +213,22 @@ export class MenuOverlay {
         }
 
         .xag-column {
-          background: rgba(12, 16, 25, 0.75);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: #0a100d;
+          border: 1px solid #1c2b22;
           border-radius: 4px;
           display: flex;
           flex-direction: column;
           padding: 14px;
           box-sizing: border-box;
           overflow-y: auto;
-          box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.35);
+          box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.5);
         }
 
         .xag-column::-webkit-scrollbar {
           width: 4px;
         }
         .xag-column::-webkit-scrollbar-thumb {
-          background: rgba(245, 158, 11, 0.4);
+          background: #008751;
           border-radius: 2px;
         }
 
@@ -240,23 +236,27 @@ export class MenuOverlay {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          border-bottom: 1px solid #1c2b22;
           padding-bottom: 8px;
           margin-bottom: 14px;
           font-size: 12px;
           font-weight: 800;
           letter-spacing: 2px;
-          color: #38bdf8;
+          color: #22c55e;
           text-transform: uppercase;
         }
-        .xag-col-header.amber { color: #f59e0b; }
-        .xag-col-header.emerald { color: #10b981; }
+        .xag-col-sublabel {
+          font-size: 10px;
+          color: #ffffff;
+          font-weight: 700;
+          letter-spacing: 1px;
+        }
 
         /* Dossier Elements */
         .xag-section-label {
           font-size: 10px;
           font-weight: 800;
-          color: #94a3b8;
+          color: #9ca3af;
           letter-spacing: 1.5px;
           margin-bottom: 6px;
           text-transform: uppercase;
@@ -267,22 +267,22 @@ export class MenuOverlay {
         .xag-input-box {
           display: flex;
           align-items: center;
-          background: rgba(7, 9, 14, 0.85);
-          border: 1.5px solid rgba(56, 189, 248, 0.4);
+          background: #050806;
+          border: 1.5px solid #1c2b22;
           border-radius: 3px;
           padding: 6px 10px;
           margin-bottom: 16px;
           transition: border-color 0.2s, box-shadow 0.2s;
         }
         .xag-input-box:focus-within {
-          border-color: #38bdf8;
-          box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+          border-color: #22c55e;
+          box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
         }
         .xag-callsign-input {
           flex: 1;
           background: transparent;
           border: none;
-          color: #f4f4f5;
+          color: #ffffff;
           font-family: 'JetBrains Mono', monospace;
           font-size: 14px;
           font-weight: 800;
@@ -290,24 +290,26 @@ export class MenuOverlay {
           letter-spacing: 1px;
         }
         .xag-edit-btn {
-          background: rgba(56, 189, 248, 0.15);
-          border: 1px solid rgba(56, 189, 248, 0.35);
-          color: #38bdf8;
-          font-size: 11px;
-          padding: 3px 7px;
+          background: rgba(0, 135, 81, 0.25);
+          border: 1px solid #008751;
+          color: #ffffff;
+          font-size: 10px;
+          font-weight: 800;
+          padding: 3px 8px;
           border-radius: 2px;
           cursor: pointer;
           transition: 0.1s;
+          letter-spacing: 1px;
         }
         .xag-edit-btn:hover {
-          background: #38bdf8;
-          color: #07080c;
+          background: #008751;
+          color: #ffffff;
         }
 
         /* Weapon Primary Card */
         .xag-weapon-card {
-          background: rgba(7, 9, 14, 0.85);
-          border: 1.5px solid rgba(245, 158, 11, 0.4);
+          background: #050806;
+          border: 1.5px solid #1c2b22;
           border-radius: 4px;
           padding: 10px 12px;
           margin-bottom: 16px;
@@ -315,8 +317,8 @@ export class MenuOverlay {
           transition: 0.15s;
         }
         .xag-weapon-card:hover {
-          border-color: #f59e0b;
-          box-shadow: 0 0 15px rgba(245, 158, 11, 0.25);
+          border-color: #22c55e;
+          box-shadow: 0 0 15px rgba(34, 197, 94, 0.25);
         }
         .xag-weapon-head {
           display: flex;
@@ -327,26 +329,27 @@ export class MenuOverlay {
         .xag-weapon-name {
           font-size: 13px;
           font-weight: 900;
-          color: #f59e0b;
+          color: #ffffff;
           letter-spacing: 1px;
         }
         .xag-cycle-btn {
-          background: rgba(245, 158, 11, 0.15);
-          border: 1px solid rgba(245, 158, 11, 0.4);
-          color: #f59e0b;
+          background: #008751;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          color: #ffffff;
           font-size: 10px;
-          font-weight: 800;
-          padding: 3px 8px;
+          font-weight: 900;
+          padding: 4px 10px;
           border-radius: 2px;
           display: flex;
           align-items: center;
           gap: 4px;
           cursor: pointer;
           transition: 0.15s;
+          letter-spacing: 1px;
         }
         .xag-cycle-btn:hover {
-          background: #f59e0b;
-          color: #07080c;
+          background: #16a34a;
+          color: #ffffff;
         }
 
         .xag-weapon-stats {
@@ -354,30 +357,31 @@ export class MenuOverlay {
           grid-template-columns: 1fr 1fr;
           gap: 6px;
           font-size: 10px;
-          color: #94a3b8;
+          color: #9ca3af;
           margin-top: 8px;
         }
         .xag-stat-bar-bg {
-          height: 4px;
-          background: rgba(255, 255, 255, 0.1);
+          height: 5px;
+          background: #1c2b22;
           border-radius: 2px;
           overflow: hidden;
           margin-top: 2px;
         }
         .xag-stat-bar-fill {
           height: 100%;
-          background: #f59e0b;
+          background: linear-gradient(90deg, #008751 0%, #16a34a 75%, #22c55e 100%);
           border-radius: 2px;
+          box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
         }
 
         /* Armory Button */
         .xag-armory-btn {
           margin-top: auto;
-          background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
-          border: 1.5px solid rgba(56, 189, 248, 0.4);
+          background: #050806;
+          border: 1.5px solid #1c2b22;
           border-radius: 4px;
           padding: 12px;
-          color: #f4f4f5;
+          color: #ffffff;
           cursor: pointer;
           transition: 0.15s;
           display: flex;
@@ -385,28 +389,31 @@ export class MenuOverlay {
           gap: 12px;
         }
         .xag-armory-btn:hover {
-          border-color: #38bdf8;
-          box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+          border-color: #22c55e;
+          background: rgba(0, 135, 81, 0.12);
+          box-shadow: 0 0 20px rgba(34, 197, 94, 0.25);
           transform: translateY(-1px);
         }
         .xag-armory-icon {
-          font-size: 22px;
+          font-size: 14px;
+          color: #22c55e;
+          font-weight: 900;
         }
         .xag-armory-title {
           font-size: 12px;
-          font-weight: 800;
-          color: #38bdf8;
+          font-weight: 900;
+          color: #ffffff;
           letter-spacing: 1px;
         }
         .xag-armory-sub {
           font-size: 10px;
-          color: #94a3b8;
+          color: #9ca3af;
         }
 
         /* Theater / Map Cards */
         .xag-map-card {
-          background: rgba(7, 9, 14, 0.85);
-          border: 1.5px solid rgba(255, 255, 255, 0.1);
+          background: #050806;
+          border: 1.5px solid #1c2b22;
           border-radius: 4px;
           padding: 10px;
           margin-bottom: 12px;
@@ -415,24 +422,19 @@ export class MenuOverlay {
           position: relative;
           overflow: hidden;
         }
-        .xag-map-card.active {
-          border-color: #f59e0b;
-          box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
-          background: rgba(245, 158, 11, 0.05);
-        }
         .xag-map-card:hover {
-          border-color: rgba(245, 158, 11, 0.7);
+          border-color: rgba(34, 197, 94, 0.6);
         }
-        .xag-map-card.lagos.active {
-          border-color: #06b6d4;
-          box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
-          background: rgba(6, 182, 212, 0.05);
+        .xag-map-card.active {
+          border: 2px solid #22c55e;
+          box-shadow: 0 0 20px rgba(0, 135, 81, 0.4);
+          background: rgba(0, 135, 81, 0.15);
         }
         .xag-map-radar-frame {
           width: 100%;
           height: 80px;
-          background: #05070a;
-          border: 1px solid rgba(255, 255, 255, 0.06);
+          background: #040705;
+          border: 1px solid #1c2b22;
           border-radius: 2px;
           margin-bottom: 8px;
           position: relative;
@@ -442,7 +444,7 @@ export class MenuOverlay {
           font-size: 13px;
           font-weight: 900;
           letter-spacing: 1px;
-          color: #f4f4f5;
+          color: #ffffff;
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -450,15 +452,15 @@ export class MenuOverlay {
         .xag-map-bounty {
           font-size: 10px;
           font-weight: 800;
-          color: #10b981;
-          background: rgba(16, 185, 129, 0.15);
-          border: 1px solid rgba(16, 185, 129, 0.4);
-          padding: 2px 6px;
+          color: #22c55e;
+          background: rgba(0, 135, 81, 0.2);
+          border: 1px solid #008751;
+          padding: 2px 7px;
           border-radius: 2px;
         }
         .xag-map-desc {
           font-size: 10px;
-          color: #71717a;
+          color: #9ca3af;
           margin-top: 4px;
         }
 
@@ -470,21 +472,24 @@ export class MenuOverlay {
           margin-top: auto;
         }
         .xag-mode-pill {
-          background: rgba(7, 9, 14, 0.85);
-          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: #050806;
+          border: 1px solid #1c2b22;
           border-radius: 3px;
           padding: 8px 4px;
           text-align: center;
           cursor: pointer;
           transition: 0.15s;
-        }
-        .xag-mode-pill.active {
-          border-color: #10b981;
-          background: rgba(16, 185, 129, 0.12);
-          color: #10b981;
+          color: #9ca3af;
         }
         .xag-mode-pill:hover {
-          border-color: #10b981;
+          border-color: #22c55e;
+          color: #ffffff;
+        }
+        .xag-mode-pill.active {
+          border: 1.5px solid #22c55e;
+          background: rgba(0, 135, 81, 0.2);
+          color: #22c55e;
+          font-weight: 800;
         }
         .xag-mode-name {
           font-size: 10px;
@@ -494,8 +499,8 @@ export class MenuOverlay {
 
         /* Rig Cards */
         .xag-rig-card {
-          background: rgba(7, 9, 14, 0.85);
-          border: 1.5px solid rgba(255, 255, 255, 0.1);
+          background: #050806;
+          border: 1.5px solid #1c2b22;
           border-radius: 4px;
           padding: 9px 12px;
           margin-bottom: 8px;
@@ -506,36 +511,34 @@ export class MenuOverlay {
           justify-content: space-between;
         }
         .xag-rig-card:hover {
-          border-color: rgba(56, 189, 248, 0.6);
+          border-color: rgba(34, 197, 94, 0.6);
         }
         .xag-rig-card.active {
-          border-color: #38bdf8;
-          box-shadow: 0 0 15px rgba(56, 189, 248, 0.25);
-          background: rgba(56, 189, 248, 0.08);
+          border: 2px solid #22c55e;
+          box-shadow: 0 0 15px rgba(0, 135, 81, 0.35);
+          background: rgba(0, 135, 81, 0.15);
         }
         .xag-rig-info {
           display: flex;
           align-items: center;
           gap: 8px;
         }
-        .xag-rig-icon {
-          font-size: 14px;
-        }
         .xag-rig-name {
           font-size: 12px;
           font-weight: 800;
-          color: #f4f4f5;
+          color: #ffffff;
           letter-spacing: 1px;
         }
         .xag-rig-card.active .xag-rig-name {
-          color: #38bdf8;
+          color: #22c55e;
         }
         .xag-rig-tag {
           font-size: 9px;
-          color: #71717a;
+          color: #6b7280;
+          font-weight: 700;
         }
         .xag-rig-card.active .xag-rig-tag {
-          color: #38bdf8;
+          color: #22c55e;
           font-weight: 800;
         }
 
@@ -543,35 +546,41 @@ export class MenuOverlay {
         .xag-deploy-container {
           margin-top: auto;
           padding-top: 10px;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          border-top: 1px solid #1c2b22;
         }
         .xag-deploy-btn {
           width: 100%;
-          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-          color: #07080c;
+          background: repeating-linear-gradient(
+            -45deg,
+            #008751,
+            #008751 16px,
+            #007345 16px,
+            #007345 32px
+          );
+          color: #ffffff;
           font-family: 'Chakra Petch', 'JetBrains Mono', sans-serif;
           font-size: 16px;
           font-weight: 900;
           letter-spacing: 3px;
           padding: 16px 14px;
-          border: none;
+          border: 1px solid rgba(255, 255, 255, 0.25);
           cursor: pointer;
           text-align: center;
           text-transform: uppercase;
           clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
-          animation: deployGlow 2.5s infinite ease-in-out;
-          transition: transform 0.1s, filter 0.1s;
+          animation: deployHazardGlow 2.5s infinite ease-in-out;
+          transition: filter 0.15s, transform 0.1s;
         }
         .xag-deploy-btn:hover {
+          filter: brightness(1.22);
           transform: scale(1.02);
-          filter: brightness(1.15);
         }
         .xag-deploy-btn:active {
           transform: scale(0.98);
         }
         .xag-deploy-decor {
           font-size: 9px;
-          color: rgba(7, 8, 12, 0.7);
+          color: rgba(255, 255, 255, 0.85);
           letter-spacing: 4px;
           margin-bottom: 2px;
           font-weight: 800;
@@ -598,7 +607,7 @@ export class MenuOverlay {
             <span class="xag-badge">[XAG]</span>
             <div>
               <div class="xag-title">SECTOR 234 // PROTOCOL ZERO</div>
-              <div class="xag-sub">AREWA & EKO 2.5D HEIST ARENA</div>
+              <div class="xag-sub">NIGERIAN SPEC-OPS 2.5D HEIST ARENA</div>
             </div>
           </div>
 
@@ -608,9 +617,9 @@ export class MenuOverlay {
           </div>
 
           <div id="btn-top-vault" class="xag-vault-badge" title="Open Syndicate Offshore Vault">
-            <span style="font-size: 14px;">🏦</span>
+            <span style="font-size: 13px; color: #22c55e;">[◆]</span>
             <div>
-              <div style="font-size: 9px; color: #71717a; font-weight: 700;">VAULT BALANCE</div>
+              <div style="font-size: 9px; color: #9ca3af; font-weight: 700;">VAULT BALANCE</div>
               <div class="xag-vault-val">₦${profile.cash_balance.toLocaleString()}</div>
             </div>
           </div>
@@ -623,58 +632,58 @@ export class MenuOverlay {
           <div class="xag-column">
             <div class="xag-col-header">
               <span>01 // OPERATOR DOSSIER</span>
-              <span style="font-size: 10px; color: #71717a;">ID: #${profile.id ? profile.id.slice(-4).toUpperCase() : '234'}</span>
+              <span class="xag-col-sublabel">ID: #${profile.id ? profile.id.slice(-4).toUpperCase() : '234'}</span>
             </div>
 
             <!-- Callsign Input -->
             <div class="xag-section-label">
               <span>CALLSIGN ID:</span>
-              <span style="color: #38bdf8;">RANK ${profile.rank}</span>
+              <span style="color: #22c55e;">RANK ${profile.rank}</span>
             </div>
             <div class="xag-input-box">
               <input id="xag-callsign-input" class="xag-callsign-input" type="text" maxlength="16" value="${this.selectedGamerTag}" spellcheck="false" />
-              <button id="btn-edit-callsign" class="xag-edit-btn" title="Edit Callsign">[✎]</button>
+              <button id="btn-edit-callsign" class="xag-edit-btn" title="Edit Callsign">[EDIT]</button>
             </div>
 
             <!-- Loadout Primary Weapon -->
             <div class="xag-section-label">
               <span>LOADOUT PRIMARY:</span>
-              <span id="weapon-cat-label" style="color: #f59e0b;">${currentWeaponDef.category.toUpperCase()}</span>
+              <span id="weapon-cat-label" style="color: #22c55e; font-weight: 800;">${currentWeaponDef.category.toUpperCase()}</span>
             </div>
             <div id="weapon-select-card" class="xag-weapon-card">
               <div class="xag-weapon-head">
                 <span id="weapon-name-display" class="xag-weapon-name">${currentWeaponDef.name.toUpperCase()}</span>
-                <button id="btn-cycle-weapon" class="xag-cycle-btn">[🔄] SWAP</button>
+                <button id="btn-cycle-weapon" class="xag-cycle-btn">[//] SWAP</button>
               </div>
-              <div style="font-size: 10px; color: #71717a; line-height: 1.3;" id="weapon-desc-display">
+              <div style="font-size: 10px; color: #9ca3af; line-height: 1.3;" id="weapon-desc-display">
                 ${currentWeaponDef.description}
               </div>
               <div class="xag-weapon-stats">
                 <div>
                   <div style="display: flex; justify-content: space-between;">
                     <span>DMG</span>
-                    <span id="stat-dmg-val" style="color: #f4f4f5; font-weight: 800;">${currentWeaponDef.damage}</span>
+                    <span id="stat-dmg-val" style="color: #ffffff; font-weight: 800;">${currentWeaponDef.damage}</span>
                   </div>
                   <div class="xag-stat-bar-bg"><div id="stat-dmg-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentWeaponDef.damage / 180) * 100)}%;"></div></div>
                 </div>
                 <div>
                   <div style="display: flex; justify-content: space-between;">
                     <span>ROF</span>
-                    <span id="stat-rof-val" style="color: #f4f4f5; font-weight: 800;">${Math.round(60 / currentWeaponDef.fireInterval)}</span>
+                    <span id="stat-rof-val" style="color: #ffffff; font-weight: 800;">${Math.round(60 / currentWeaponDef.fireInterval)}</span>
                   </div>
                   <div class="xag-stat-bar-bg"><div id="stat-rof-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (0.4 / Math.max(0.06, currentWeaponDef.fireInterval)) * 100)}%;"></div></div>
                 </div>
                 <div>
                   <div style="display: flex; justify-content: space-between;">
                     <span>RNG</span>
-                    <span id="stat-rng-val" style="color: #f4f4f5; font-weight: 800;">${currentWeaponDef.range}m</span>
+                    <span id="stat-rng-val" style="color: #ffffff; font-weight: 800;">${currentWeaponDef.range}m</span>
                   </div>
                   <div class="xag-stat-bar-bg"><div id="stat-rng-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentWeaponDef.range / 45) * 100)}%;"></div></div>
                 </div>
                 <div>
                   <div style="display: flex; justify-content: space-between;">
                     <span>MAG</span>
-                    <span id="stat-mag-val" style="color: #f4f4f5; font-weight: 800;">${currentWeaponDef.magSize}</span>
+                    <span id="stat-mag-val" style="color: #ffffff; font-weight: 800;">${currentWeaponDef.magSize}</span>
                   </div>
                   <div class="xag-stat-bar-bg"><div id="stat-mag-bar" class="xag-stat-bar-fill" style="width: ${Math.min(100, (currentWeaponDef.magSize / 120) * 100)}%;"></div></div>
                 </div>
@@ -683,19 +692,19 @@ export class MenuOverlay {
 
             <!-- Open Bank & Armory -->
             <button id="btn-open-dossier" class="xag-armory-btn">
-              <span class="xag-armory-icon">🗂️</span>
+              <span class="xag-armory-icon">[+]</span>
               <div>
-                <div class="xag-armory-title">[ OPEN BANK & ARMORY ]</div>
-                <div class="xag-armory-sub">Unlock Guns & Syndicate Perks</div>
+                <div class="xag-armory-title">[ OPEN ARMORY & VAULT ]</div>
+                <div class="xag-armory-sub">Unlock Weapons & Spec-Ops Assets</div>
               </div>
             </button>
           </div>
 
           <!-- 02 // DEPLOYMENT THEATER -->
           <div class="xag-column">
-            <div class="xag-col-header amber">
+            <div class="xag-col-header">
               <span>02 // DEPLOYMENT THEATER</span>
-              <span style="font-size: 10px; color: #f59e0b;">SECTOR MAP</span>
+              <span class="xag-col-sublabel">SECTOR MAP</span>
             </div>
 
             <!-- Birnin Kano Map Card -->
@@ -704,25 +713,25 @@ export class MenuOverlay {
                 <canvas id="radar-canvas-kano" width="280" height="80" style="width: 100%; height: 100%; display: block;"></canvas>
               </div>
               <div class="xag-map-title">
-                <span>🏺 BIRNIN KANO // 2099</span>
+                <span>[◆] BIRNIN KANO // 2099</span>
                 <span class="xag-map-bounty">₦1,000,000</span>
               </div>
               <div class="xag-map-desc">
-                1800s Earthen Citadel • Tubali Mud Walls • Farin Kasa Horns • Royal Vault
+                Earthen Mud Citadel • Tubali Ramparts • Lime Zankwaye Horns • Treasury Vault
               </div>
             </div>
 
             <!-- Lagos Map Card -->
-            <div class="xag-map-card lagos ${this.selectedMap === MapId.LAGOS_GOSLOW ? 'active' : ''}" data-map="LAGOS_GOSLOW">
+            <div class="xag-map-card ${this.selectedMap === MapId.LAGOS_GOSLOW ? 'active' : ''}" data-map="LAGOS_GOSLOW">
               <div class="xag-map-radar-frame">
                 <canvas id="radar-canvas-lagos" width="280" height="80" style="width: 100%; height: 100%; display: block;"></canvas>
               </div>
               <div class="xag-map-title">
-                <span>🚌 LAGOS // EKO SECTOR</span>
+                <span>[▲] LAGOS // EKO SECTOR</span>
                 <span class="xag-map-bounty">₦1,500,000</span>
               </div>
               <div class="xag-map-desc">
-                Danfo Expressway Gridlock • 3rd Mainland Flyover • Blackout Rain
+                Expressway Traffic Gridlock • 3rd Mainland Flyover • Blackout Rain
               </div>
             </div>
 
@@ -732,73 +741,69 @@ export class MenuOverlay {
             </div>
             <div class="xag-mode-grid">
               <div class="xag-mode-pill ${this.selectedMode === GameModeType.ODOGWU_STASH ? 'active' : ''}" data-mode="ODOGWU_STASH">
-                <div class="xag-mode-name">👑 SARKI HEIST</div>
-                <div style="font-size: 8px; color: #71717a; margin-top: 2px;">3-Act Evac</div>
+                <div class="xag-mode-name">[◆] SARKI HEIST</div>
+                <div style="font-size: 8px; color: #6b7280; margin-top: 2px;">3-Act Evac</div>
               </div>
               <div class="xag-mode-pill ${this.selectedMode === GameModeType.VAULT_HEIST ? 'active' : ''}" data-mode="VAULT_HEIST">
-                <div class="xag-mode-name">🏦 VAULT CRACK</div>
-                <div style="font-size: 8px; color: #71717a; margin-top: 2px;">3v3 Strike</div>
+                <div class="xag-mode-name">[▲] VAULT CRACK</div>
+                <div style="font-size: 8px; color: #6b7280; margin-top: 2px;">3v3 Strike</div>
               </div>
               <div class="xag-mode-pill ${this.selectedMode === GameModeType.APAPA_LOCKDOWN ? 'active' : ''}" data-mode="APAPA_LOCKDOWN">
-                <div class="xag-mode-name">🚢 LOCKDOWN</div>
-                <div style="font-size: 8px; color: #71717a; margin-top: 2px;">High-Yield</div>
+                <div class="xag-mode-name">[//] LOCKDOWN</div>
+                <div style="font-size: 8px; color: #6b7280; margin-top: 2px;">High-Yield</div>
               </div>
             </div>
           </div>
 
           <!-- 03 // TACTICAL RIG + DEPLOY LAUNCHER -->
           <div class="xag-column">
-            <div class="xag-col-header emerald">
+            <div class="xag-col-header">
               <span>03 // TACTICAL RIG</span>
-              <span style="font-size: 10px; color: #10b981;">MOBILITY CORE</span>
+              <span class="xag-col-sublabel">MOBILITY CORE</span>
             </div>
 
             <!-- Rig 1: Phase Dash (Specter) -->
             <div class="xag-rig-card ${this.selectedRig === MovementRigType.PHASE_DASH ? 'active' : ''}" data-rig="${MovementRigType.PHASE_DASH}">
               <div class="xag-rig-info">
-                <span class="xag-rig-icon">⚡</span>
                 <div>
-                  <div class="xag-rig-name">[⚡] SPECTER // PHASE</div>
-                  <div style="font-size: 9px; color: #71717a;">High-speed tactical dash through thin covers</div>
+                  <div class="xag-rig-name">[▲] SPECTER // PHASE</div>
+                  <div style="font-size: 9px; color: #9ca3af;">High-speed tactical dash through thin covers</div>
                 </div>
               </div>
-              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.PHASE_DASH ? 'EQUIPPED' : '3.0s CD'}</div>
+              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.PHASE_DASH ? '[ACTIVE]' : '3.0s CD'}</div>
             </div>
 
             <!-- Rig 2: Breach Booster (Vanguard) -->
             <div class="xag-rig-card ${this.selectedRig === MovementRigType.BREACH_BOOSTER ? 'active' : ''}" data-rig="${MovementRigType.BREACH_BOOSTER}">
               <div class="xag-rig-info">
-                <span class="xag-rig-icon">🚀</span>
                 <div>
-                  <div class="xag-rig-name">[🚀] VANGUARD // BREACH</div>
-                  <div style="font-size: 9px; color: #71717a;">Smashes 3 layers of mud/concrete walls</div>
+                  <div class="xag-rig-name">[◆] VANGUARD // BREACH</div>
+                  <div style="font-size: 9px; color: #9ca3af;">Smashes 3 layers of mud/concrete walls</div>
                 </div>
               </div>
-              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.BREACH_BOOSTER ? 'EQUIPPED' : '2.5s CD'}</div>
+              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.BREACH_BOOSTER ? '[ACTIVE]' : '2.5s CD'}</div>
             </div>
 
             <!-- Rig 3: Glitch Anchor (Chronos) -->
             <div class="xag-rig-card ${this.selectedRig === MovementRigType.GLITCH_ANCHOR ? 'active' : ''}" data-rig="${MovementRigType.GLITCH_ANCHOR}">
               <div class="xag-rig-info">
-                <span class="xag-rig-icon">⏱️</span>
                 <div>
-                  <div class="xag-rig-name">[⏱️] CHRONOS // ANCHOR</div>
-                  <div style="font-size: 9px; color: #71717a;">Temporal snap-back repositioning beacon</div>
+                  <div class="xag-rig-name">[⬢] CHRONOS // ANCHOR</div>
+                  <div style="font-size: 9px; color: #9ca3af;">Temporal snap-back repositioning beacon</div>
                 </div>
               </div>
-              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.GLITCH_ANCHOR ? 'EQUIPPED' : '4.0s CD'}</div>
+              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.GLITCH_ANCHOR ? '[ACTIVE]' : '4.0s CD'}</div>
             </div>
 
             <!-- Rig 4: Overdrive Slide (Striker) -->
             <div class="xag-rig-card ${this.selectedRig === MovementRigType.OVERDRIVE_SLIDE ? 'active' : ''}" data-rig="${MovementRigType.OVERDRIVE_SLIDE}">
               <div class="xag-rig-info">
-                <span class="xag-rig-icon">🔥</span>
                 <div>
-                  <div class="xag-rig-name">[🔥] STRIKER // SLIDE</div>
-                  <div style="font-size: 9px; color: #71717a;">Kinetic power-slides + vertical wall-kicks</div>
+                  <div class="xag-rig-name">[▶] STRIKER // SLIDE</div>
+                  <div style="font-size: 9px; color: #9ca3af;">Kinetic power-slides + vertical wall-kicks</div>
                 </div>
               </div>
-              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.OVERDRIVE_SLIDE ? 'EQUIPPED' : '1.5s CD'}</div>
+              <div class="xag-rig-tag">${this.selectedRig === MovementRigType.OVERDRIVE_SLIDE ? '[ACTIVE]' : '1.5s CD'}</div>
             </div>
 
             <!-- Deploy Launcher Button -->
@@ -921,7 +926,7 @@ export class MenuOverlay {
         });
         card.classList.add('active');
         const activeTag = card.querySelector('.xag-rig-tag');
-        if (activeTag) activeTag.textContent = 'EQUIPPED';
+        if (activeTag) activeTag.textContent = '[ACTIVE]';
         this.selectedRig = card.getAttribute('data-rig') as MovementRigType;
         this.audio?.playUISelect();
       };
@@ -941,7 +946,7 @@ export class MenuOverlay {
     if (dossierBtn) dossierBtn.addEventListener('click', openDossierHandler);
     if (topVaultBtn) topVaultBtn.addEventListener('click', openDossierHandler);
 
-    // 7. Start Animated Canvas Radars
+    // 7. Start Animated Canvas Radars in Phosphor Tactical Green
     this.startRadarAnimation();
 
     // 8. Deploy Button Handler
@@ -1006,7 +1011,7 @@ export class MenuOverlay {
       sweepAngle += 0.04;
       rainOffset = (rainOffset + 2) % 30;
 
-      // 1. Birnin Kano Radar Sweep (Warm Terracotta / Gold Radar)
+      // 1. Birnin Kano Radar Sweep (Phosphor Night-Vision Military Green #22C55E / #008751)
       if (kanoCanvas) {
         const ctx = kanoCanvas.getContext('2d');
         if (ctx) {
@@ -1015,11 +1020,11 @@ export class MenuOverlay {
           const cx = w * 0.5;
           const cy = h * 0.5;
 
-          ctx.fillStyle = '#05070a';
+          ctx.fillStyle = '#040705';
           ctx.fillRect(0, 0, w, h);
 
           // Grid lines
-          ctx.strokeStyle = 'rgba(245, 158, 11, 0.12)';
+          ctx.strokeStyle = 'rgba(0, 135, 81, 0.2)';
           ctx.lineWidth = 1;
           for (let x = 0; x < w; x += 24) {
             ctx.beginPath();
@@ -1035,6 +1040,7 @@ export class MenuOverlay {
           }
 
           // Concentric circles
+          ctx.strokeStyle = 'rgba(34, 197, 94, 0.35)';
           [20, 36, 54].forEach((r) => {
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -1046,8 +1052,9 @@ export class MenuOverlay {
           ctx.translate(cx, cy);
           ctx.rotate(sweepAngle);
           const grad = ctx.createLinearGradient(0, 0, 70, 0);
-          grad.addColorStop(0, 'rgba(245, 158, 11, 0.6)');
-          grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+          grad.addColorStop(0, 'rgba(34, 197, 94, 0.65)');
+          grad.addColorStop(0.5, 'rgba(0, 135, 81, 0.3)');
+          grad.addColorStop(1, 'rgba(0, 135, 81, 0)');
           ctx.fillStyle = grad;
           ctx.beginPath();
           ctx.moveTo(0, 0);
@@ -1056,36 +1063,36 @@ export class MenuOverlay {
           ctx.fill();
           ctx.restore();
 
-          // Sarki Treasury Vault Blip (Center Gold Diamond)
-          ctx.fillStyle = '#f59e0b';
+          // Sarki Treasury Vault Blip (Center Green Diamond)
+          ctx.fillStyle = '#22c55e';
           ctx.beginPath();
           ctx.arc(cx, cy, 3, 0, Math.PI * 2);
           ctx.fill();
           ctx.font = 'bold 8px monospace';
-          ctx.fillStyle = '#f59e0b';
-          ctx.fillText('VAULT', cx + 6, cy + 3);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText('[◆] VAULT', cx + 6, cy + 3);
 
-          // Operative Blips
-          ctx.fillStyle = '#10b981';
+          // Operative Blips (Phosphor Green & White)
+          ctx.fillStyle = '#22c55e';
           ctx.fillRect(cx - 32, cy - 14, 3, 3);
           ctx.fillRect(cx + 42, cy + 18, 3, 3);
-          ctx.fillStyle = '#ef4444';
+          ctx.fillStyle = '#ffffff';
           ctx.fillRect(cx + 28, cy - 22, 3, 3);
         }
       }
 
-      // 2. Lagos Highway Expressway Telemetry (Rain & Moving Danfo Blips)
+      // 2. Lagos Highway Expressway Telemetry (Night-Vision Green Grid & Convoy Blips)
       if (lagosCanvas) {
         const ctx = lagosCanvas.getContext('2d');
         if (ctx) {
           const w = lagosCanvas.width;
           const h = lagosCanvas.height;
 
-          ctx.fillStyle = '#05070a';
+          ctx.fillStyle = '#040705';
           ctx.fillRect(0, 0, w, h);
 
           // Third Mainland Highway Flyover lines
-          ctx.strokeStyle = 'rgba(6, 182, 212, 0.2)';
+          ctx.strokeStyle = '#008751';
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.moveTo(0, 24);
@@ -1095,7 +1102,7 @@ export class MenuOverlay {
           ctx.stroke();
 
           // Highway lane dividers
-          ctx.strokeStyle = 'rgba(250, 204, 21, 0.35)';
+          ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
           ctx.setLineDash([8, 8]);
           ctx.beginPath();
           ctx.moveTo(0, 40);
@@ -1104,7 +1111,7 @@ export class MenuOverlay {
           ctx.setLineDash([]);
 
           // Rainfall streaks
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.18)';
+          ctx.strokeStyle = 'rgba(34, 197, 94, 0.22)';
           ctx.lineWidth = 1;
           for (let rx = 10; rx < w; rx += 28) {
             const ry = (rx * 1.5 + rainOffset * 3) % h;
@@ -1114,21 +1121,21 @@ export class MenuOverlay {
             ctx.stroke();
           }
 
-          // Yellow Danfo Bus blips moving along expressway
+          // Moving Convoy Blips along expressway
           const busX1 = (sweepAngle * 40) % (w + 40) - 20;
           const busX2 = (sweepAngle * 25 + 100) % (w + 40) - 20;
 
-          ctx.fillStyle = '#facc15';
+          ctx.fillStyle = '#22c55e';
           ctx.fillRect(busX1, 36, 12, 7);
           ctx.fillRect(busX2, 36, 12, 7);
-          ctx.fillStyle = '#0f172a';
+          ctx.fillStyle = '#ffffff';
           ctx.fillRect(busX1 + 2, 38, 8, 3);
           ctx.fillRect(busX2 + 2, 38, 8, 3);
 
           // Flyover Status Text
           ctx.font = 'bold 8px monospace';
-          ctx.fillStyle = '#06b6d4';
-          ctx.fillText('3RD MAINLAND RADAR // EKO GRIDLOCK', 10, 14);
+          ctx.fillStyle = '#22c55e';
+          ctx.fillText('[▲] 3RD MAINLAND // NIGHT-VISION RADAR', 10, 14);
         }
       }
 
@@ -1145,7 +1152,7 @@ export class MenuOverlay {
     modal.id = 'dossier-modal';
     modal.style.position = 'fixed';
     modal.style.inset = '0';
-    modal.style.background = 'rgba(7, 7, 9, 0.94)';
+    modal.style.background = 'rgba(5, 8, 6, 0.95)';
     modal.style.backdropFilter = 'blur(12px)';
     modal.style.zIndex = '1000';
     modal.style.display = 'flex';
@@ -1164,24 +1171,24 @@ export class MenuOverlay {
       ];
 
       modal.innerHTML = `
-        <div style="width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; background: #0c1019; border: 2px solid #f59e0b; border-radius: 6px; padding: 22px; font-family: 'JetBrains Mono', monospace; color: #f4f4f5; box-shadow: 0 0 50px rgba(245, 158, 11, 0.25);">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 10px; margin-bottom: 16px;">
+        <div style="width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; background: #0a100d; border: 2px solid #008751; border-radius: 6px; padding: 22px; font-family: 'JetBrains Mono', monospace; color: #f4f4f5; box-shadow: 0 0 50px rgba(0, 135, 81, 0.35);">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1c2b22; padding-bottom: 10px; margin-bottom: 16px;">
             <div>
-              <div style="color: #f59e0b; font-size: 11px; font-weight: 800; letter-spacing: 2px;">[XAG] SYNDICATE CONTRACTOR DOSSIER</div>
-              <h2 style="font-size: 20px; font-weight: 900; margin: 2px 0 0 0;">${p.call_sign}</h2>
+              <div style="color: #22c55e; font-size: 11px; font-weight: 800; letter-spacing: 2px;">[XAG] SPEC-OPS CONTRACTOR DOSSIER</div>
+              <h2 style="font-size: 20px; font-weight: 900; margin: 2px 0 0 0; color: #ffffff;">${p.call_sign}</h2>
             </div>
-            <button id="close-dossier" style="background: rgba(255, 255, 255, 0.08); border: 1px solid #3f3f46; color: #a1a1aa; padding: 6px 14px; border-radius: 3px; cursor: pointer; font-weight: 800;">✕ CLOSE</button>
+            <button id="close-dossier" style="background: rgba(255, 255, 255, 0.08); border: 1px solid #1c2b22; color: #9ca3af; padding: 6px 14px; border-radius: 3px; cursor: pointer; font-weight: 800;">[X] CLOSE</button>
           </div>
 
           <!-- Balance & Rank Card -->
-          <div style="background: rgba(7, 9, 14, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); padding: 14px; border-radius: 4px; margin-bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div style="background: #050806; border: 1px solid #1c2b22; padding: 14px; border-radius: 4px; margin-bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
-              <div style="color: #71717a; font-size: 10px; font-weight: 700;">PERMANENT OFFSHORE VAULT</div>
-              <div style="color: #10b981; font-size: 22px; font-weight: 900;">₦${p.cash_balance.toLocaleString()}</div>
+              <div style="color: #9ca3af; font-size: 10px; font-weight: 700;">PERMANENT OFFSHORE VAULT</div>
+              <div style="color: #22c55e; font-size: 22px; font-weight: 900;">₦${p.cash_balance.toLocaleString()}</div>
             </div>
             <div>
-              <div style="color: #71717a; font-size: 10px; font-weight: 700;">SYNDICATE CLEARANCE RANK</div>
-              <div style="color: #f59e0b; font-size: 22px; font-weight: 900;">RANK ${p.rank}</div>
+              <div style="color: #9ca3af; font-size: 10px; font-weight: 700;">SYNDICATE CLEARANCE RANK</div>
+              <div style="color: #ffffff; font-size: 22px; font-weight: 900;">RANK ${p.rank}</div>
             </div>
           </div>
 
@@ -1189,41 +1196,41 @@ export class MenuOverlay {
           ${
             !p.is_claimed
               ? `
-            <div style="background: rgba(245, 158, 11, 0.08); border: 1px dashed #f59e0b; border-radius: 4px; padding: 14px; margin-bottom: 18px;">
-              <div style="color: #f59e0b; font-size: 12px; font-weight: 800; margin-bottom: 4px;">CLAIM CONTRACTOR IDENTITY (CLOUD SYNC)</div>
-              <p style="color: #a1a1aa; font-size: 11px; margin: 0 0 10px 0;">Secure your permanent offshore bank balance with a password. Zero email confirmations needed.</p>
+            <div style="background: rgba(0, 135, 81, 0.1); border: 1px dashed #008751; border-radius: 4px; padding: 14px; margin-bottom: 18px;">
+              <div style="color: #22c55e; font-size: 12px; font-weight: 800; margin-bottom: 4px;">CLAIM CONTRACTOR IDENTITY (CLOUD SYNC)</div>
+              <p style="color: #9ca3af; font-size: 11px; margin: 0 0 10px 0;">Secure your permanent offshore bank balance with a password. Zero email confirmations needed.</p>
               <div style="display: flex; gap: 8px;">
-                <input id="claim-password" type="password" placeholder="Create Secret Password" style="flex: 1; background: #18181b; border: 1px solid #3f3f46; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 12px; outline: none;" />
-                <button id="btn-submit-claim" style="background: #f59e0b; color: #000; border: none; font-weight: 800; padding: 8px 14px; border-radius: 4px; cursor: pointer;">CLAIM</button>
+                <input id="claim-password" type="password" placeholder="Create Secret Password" style="flex: 1; background: #050806; border: 1px solid #1c2b22; color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 12px; outline: none;" />
+                <button id="btn-submit-claim" style="background: #008751; color: #ffffff; border: none; font-weight: 800; padding: 8px 14px; border-radius: 4px; cursor: pointer;">CLAIM</button>
               </div>
             </div>
           `
               : `
-            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid #10b981; border-radius: 4px; padding: 10px 14px; margin-bottom: 18px; display: flex; align-items: center; gap: 8px;">
-              <span style="color: #10b981; font-size: 16px;">✓</span>
-              <span style="color: #10b981; font-size: 11px; font-weight: 700;">CONTRACTOR PROFILE VERIFIED & CLOUD-SECURED</span>
+            <div style="background: rgba(0, 135, 81, 0.12); border: 1px solid #008751; border-radius: 4px; padding: 10px 14px; margin-bottom: 18px; display: flex; align-items: center; gap: 8px;">
+              <span style="color: #22c55e; font-size: 16px;">[✓]</span>
+              <span style="color: #22c55e; font-size: 11px; font-weight: 800;">CONTRACTOR PROFILE VERIFIED & CLOUD-SECURED</span>
             </div>
           `
           }
 
           <!-- Black-Market Armory Unlocks -->
           <div>
-            <div style="color: #f4f4f5; font-size: 12px; font-weight: 800; margin-bottom: 10px; letter-spacing: 1px;">BLACK-MARKET ARMORY UNLOCKS</div>
+            <div style="color: #22c55e; font-size: 12px; font-weight: 800; margin-bottom: 10px; letter-spacing: 1px;">SPEC-OPS ARMORY UNLOCKS</div>
             <div style="display: grid; gap: 8px;">
               ${armoryWeapons
                 .map((w) => {
                   const def = WEAPON_REGISTRY[w.id];
                   const unlocked = service.isWeaponUnlocked(w.id);
                   return `
-                  <div style="background: rgba(7, 9, 14, 0.85); border: 1px solid ${unlocked ? '#10b981' : 'rgba(255, 255, 255, 0.1)'}; padding: 10px 14px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                  <div style="background: #050806; border: 1px solid ${unlocked ? '#008751' : '#1c2b22'}; padding: 10px 14px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                      <div style="font-size: 13px; font-weight: 800; color: ${unlocked ? '#10b981' : '#f4f4f5'};">${def.name}</div>
-                      <div style="font-size: 10px; color: #71717a;">${def.description}</div>
+                      <div style="font-size: 13px; font-weight: 800; color: ${unlocked ? '#22c55e' : '#ffffff'};">${def.name}</div>
+                      <div style="font-size: 10px; color: #9ca3af;">${def.description}</div>
                     </div>
                     ${
                       unlocked
-                        ? `<span style="color: #10b981; font-size: 11px; font-weight: 800;">UNLOCKED</span>`
-                        : `<button class="btn-unlock-weapon" data-id="${w.id}" data-cost="${w.cost}" style="background: #27272a; border: 1px solid #3f3f46; color: #f59e0b; font-size: 11px; font-weight: 800; padding: 6px 12px; border-radius: 4px; cursor: pointer;">BUY ₦${w.cost.toLocaleString()}</button>`
+                        ? `<span style="color: #22c55e; font-size: 11px; font-weight: 800;">[UNLOCKED]</span>`
+                        : `<button class="btn-unlock-weapon" data-id="${w.id}" data-cost="${w.cost}" style="background: #008751; border: 1px solid rgba(255,255,255,0.2); color: #ffffff; font-size: 11px; font-weight: 800; padding: 6px 12px; border-radius: 4px; cursor: pointer;">BUY ₦${w.cost.toLocaleString()}</button>`
                     }
                   </div>
                 `;
@@ -1278,10 +1285,10 @@ export class MenuOverlay {
     let rowsHtml = '';
     scoreboard.forEach((entry, idx) => {
       rowsHtml += `
-        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: ${entry.isLocal ? '#06b6d4' : '#e4e4e7'};">
+        <tr style="border-bottom: 1px solid #1c2b22; color: ${entry.isLocal ? '#22c55e' : '#e4e4e7'};">
           <td style="padding: 10px; font-weight: 800;">#${idx + 1}</td>
-          <td style="padding: 10px;">${entry.name} ${entry.isSarki || entry.isOdogwu ? '👑' : ''}</td>
-          <td style="padding: 10px; font-family: 'JetBrains Mono', monospace; color: #10b981; font-weight: 800;">₦${entry.cash.toLocaleString()}</td>
+          <td style="padding: 10px;">${entry.name} ${entry.isSarki || entry.isOdogwu ? '[◆]' : ''}</td>
+          <td style="padding: 10px; font-family: 'JetBrains Mono', monospace; color: #22c55e; font-weight: 800;">₦${entry.cash.toLocaleString()}</td>
           <td style="padding: 10px; text-align: center;">${entry.kills}</td>
           <td style="padding: 10px; text-align: center;">${entry.deaths}</td>
           <td style="padding: 10px; text-align: center;">${entry.wallsDestroyed}</td>
@@ -1290,18 +1297,18 @@ export class MenuOverlay {
     });
 
     this.container.innerHTML = `
-      <div style="position: absolute; inset: 0; background: rgba(7, 7, 9, 0.95); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 12px; pointer-events: auto;">
-        <div style="width: 100%; max-width: 640px; max-height: 94vh; overflow-y: auto; background: #0c1019; border: 1.5px solid rgba(245, 158, 11, 0.4); box-shadow: 0 0 50px rgba(245, 158, 11, 0.25); padding: 20px 24px; border-radius: 6px;">
+      <div style="position: absolute; inset: 0; background: rgba(5, 8, 6, 0.95); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 12px; pointer-events: auto;">
+        <div style="width: 100%; max-width: 640px; max-height: 94vh; overflow-y: auto; background: #0a100d; border: 1.5px solid #008751; box-shadow: 0 0 50px rgba(0, 135, 81, 0.3); padding: 20px 24px; border-radius: 6px;">
           <!-- Header -->
           <div style="text-align: center; margin-bottom: 16px;">
-            <div style="color: #f59e0b; font-size: 11px; font-weight: 800; letter-spacing: 2px;">STUDIO XAG // AFTER-ACTION REPORT</div>
-            <h2 style="color: #f4f4f5; font-size: 22px; font-weight: 900; margin-top: 4px;">👑 THE SARKI: ${sarki.name.toUpperCase()} (₦${sarki.cash.toLocaleString()})</h2>
+            <div style="color: #22c55e; font-size: 11px; font-weight: 800; letter-spacing: 2px;">STUDIO XAG // AFTER-ACTION REPORT</div>
+            <h2 style="color: #ffffff; font-size: 22px; font-weight: 900; margin-top: 4px;">[◆] THE SARKI: ${sarki.name.toUpperCase()} (₦${sarki.cash.toLocaleString()})</h2>
           </div>
 
           <!-- Scoreboard Table -->
           <table style="width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-bottom: 20px;">
             <thead>
-              <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.15); color: #a1a1aa; text-align: left;">
+              <tr style="border-bottom: 1px solid #1c2b22; color: #9ca3af; text-align: left;">
                 <th style="padding: 8px;">RANK</th>
                 <th style="padding: 8px;">OPERATIVE</th>
                 <th style="padding: 8px;">NET WORTH</th>
@@ -1317,10 +1324,10 @@ export class MenuOverlay {
 
           <!-- Actions -->
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <button id="summary-receipt-btn" style="background: rgba(245, 158, 11, 0.1); border: 1.5px solid #f59e0b; color: #f59e0b; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; padding: 12px; border-radius: 4px; cursor: pointer; letter-spacing: 1px;">
+            <button id="summary-receipt-btn" style="background: #050806; border: 1.5px solid #22c55e; color: #22c55e; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; padding: 12px; border-radius: 4px; cursor: pointer; letter-spacing: 1px;">
               DOWNLOAD RECEIPT (PNG)
             </button>
-            <button id="summary-rematch-btn" style="background: #10b981; color: #070709; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 900; padding: 12px; border: none; border-radius: 4px; cursor: pointer; letter-spacing: 1px;">
+            <button id="summary-rematch-btn" style="background: #008751; color: #ffffff; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 900; padding: 12px; border: none; border-radius: 4px; cursor: pointer; letter-spacing: 1px;">
               NEXT CONTRACT [REMATCH]
             </button>
           </div>
