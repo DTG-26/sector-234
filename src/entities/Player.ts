@@ -226,7 +226,7 @@ export class Player {
     if (isThrusting) {
       this.isJetFlying = true;
       this.actor.isJetFlying = true;
-      const thrustStrength = Math.max(0.35, flyIntensity);
+      const thrustStrength = Math.max(0.9, flyIntensity);
       this.actor.velocity.y += jetpackThrust * thrustStrength * dt;
       this.actor.isGrounded = false;
       this.mesh.triggerThrusterBurst(true);

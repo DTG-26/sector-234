@@ -7,6 +7,7 @@ export class Engine3D {
   public scene: THREE.Scene;
   public cameraSystem: Camera3D;
   public postProcessing: PostProcessing;
+  public isMobile: boolean = false;
   private container: HTMLElement;
   private isRunning: boolean = false;
   private lastTime: number = 0;
@@ -20,20 +21,22 @@ export class Engine3D {
     }
     this.container = container;
 
-    // 1. Initialize High-Performance PBR Renderer
+    this.isMobile = window.innerWidth <= 900 || ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+    // 1. Initialize High-Performance PBR Renderer (Optimized for 60 FPS mobile throughput)
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: !this.isMobile,
       powerPreference: 'high-performance',
       alpha: false,
       depth: true,
+      precision: this.isMobile ? 'mediump' : 'highp',
     });
-    const isMobile = window.innerWidth <= 900 || ('ontouchstart' in window);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(isMobile ? 1.0 : Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(this.isMobile ? 1.0 : Math.min(window.devicePixelRatio, 1.5));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.25; // Bright, crisp, vibrant
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = isMobile ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+    this.renderer.toneMappingExposure = 1.25;
+    this.renderer.shadowMap.enabled = !this.isMobile;
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
 
     this.container.appendChild(this.renderer.domElement);
 
@@ -158,7 +161,11 @@ export class Engine3D {
     }
 
     this.cameraSystem.update(dt);
-    this.postProcessing.render();
+    if (this.isMobile) {
+      this.renderer.render(this.scene, this.cameraSystem.camera);
+    } else {
+      this.postProcessing.render();
+    }
 
     this.animationFrameId = requestAnimationFrame(this.loop);
   };
