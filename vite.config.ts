@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   server: {
     host: true,
-    port: 5173,
+    port: 3000,
     allowedHosts: true,
     cors: true,
     watch: {
@@ -12,7 +12,7 @@ export default defineConfig({
   },
   preview: {
     host: true,
-    port: 5173,
+    port: 3000,
     allowedHosts: true,
     cors: true
   }

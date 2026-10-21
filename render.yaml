@@ -1,12 +1,13 @@
 services:
   - type: web
-    name: xag-protocol-zero-server
+    name: sector-234
     env: node
     plan: free
-    buildCommand: npm install
-    startCommand: npm run server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: PORT
         value: 8080
       - key: NODE_VERSION
-        value: 24.2.0
+        value: 20.18.0

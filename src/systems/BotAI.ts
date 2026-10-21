@@ -118,6 +118,17 @@ export class BotAI {
           const other = allPlayers[i];
           if (other.stats.id === this.player.stats.id || other.stats.isDead) continue;
 
+          // Never target teammates in Team Deathmatch
+          if (
+            this.player.stats.team &&
+            other.stats.team &&
+            this.player.stats.team !== 'none' &&
+            other.stats.team !== 'none' &&
+            this.player.stats.team === other.stats.team
+          ) {
+            continue;
+          }
+
           const dist = this.player.actor.position.distanceTo(other.actor.position);
           // Prioritize Odogwu crown, otherwise fight whichever player or bot is closest!
           const priorityMultiplier = other.mesh.crownMesh.visible ? 0.45 : 1.0;

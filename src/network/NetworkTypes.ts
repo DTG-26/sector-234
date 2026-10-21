@@ -53,6 +53,7 @@ export interface NetworkPlayerState {
   activeWeapon: WeaponId;
   isDead: boolean;
   timestamp: number;
+  team?: 'blue' | 'red' | 'none';
 }
 
 // Packet Payloads
@@ -75,6 +76,7 @@ export interface RoomStatePayload {
   players: NetworkLobbyPlayer[];
   matchActive: boolean;
   fillBots: boolean;
+  teamSize?: number;
 }
 
 export interface MatchStartingPayload {
@@ -83,6 +85,7 @@ export interface MatchStartingPayload {
   mode: GameModeType;
   seed: number;
   fillBots: boolean;
+  teamSize?: number;
 }
 
 export interface ToggleBotsPayload {

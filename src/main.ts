@@ -15,7 +15,9 @@ import { HUDCanvas } from './ui/HUDCanvas';
 import { MenuOverlay, MenuStartOptions } from './ui/MenuOverlay';
 import { GameModeType, HeistAct, MapId, MovementRigType, WeaponId } from './config/types';
 import { Player } from './entities/Player';
-import { NetworkClient } from './network/NetworkClient';
+import { P2PNetworkManager } from './network/P2PNetworkManager';
+import { RemotePlayerController } from './network/RemotePlayerController';
+import { NetworkPlayerState } from './network/NetworkTypes';
 
 console.log('[STUDIO XAG: PROTOCOL ZERO] Initializing Tactical Arena Engine...');
 
@@ -63,17 +65,43 @@ let currentMode: GameModeType = GameModeType.ODOGWU_STASH;
 let isGameActive = false;
 let lastNetTick = 0;
 
-// 3.5. Initialize Network Client & Callbacks
-const net = NetworkClient.getInstance();
+// 3.5. Initialize WebRTC P2P Network Manager & Callbacks
+const net = P2PNetworkManager.getInstance();
 
 net.onSnapshot = (snapshot) => {
   if (!isGameActive || !localPlayer) return;
   for (const pState of snapshot.players) {
     if (pState.id === localPlayer.stats.id) continue;
-    const controller = modeManager.remoteControllers.get(pState.id);
-    if (controller) {
-      controller.applySnapshot(pState);
+    let controller = modeManager.remoteControllers.get(pState.id);
+    let p = modeManager.players.find((pl) => pl.stats.id === pState.id);
+    if (!controller) {
+      if (!p) {
+        const isBot = pState.id.startsWith('bot_');
+        const name = isBot ? pState.id.replace('bot_', 'Operative_') : 'Operative';
+        p = new Player(
+          engine.scene,
+          pState.id,
+          name,
+          pState.x,
+          pState.y,
+          false
+        );
+        p.stats.activeWeapon = pState.activeWeapon;
+        p.mesh.setWeapon(pState.activeWeapon);
+        if (pState.team) {
+          const isAlly = pState.team !== 'none' && pState.team === localPlayer.stats.team;
+          p.setTeam(pState.team, isAlly);
+        }
+        modeManager.players.push(p);
+      }
+      controller = new RemotePlayerController(p, particles);
+      modeManager.remoteControllers.set(pState.id, controller);
     }
+    if (p && pState.team && p.stats.team !== pState.team) {
+      const isAlly = pState.team !== 'none' && pState.team === localPlayer.stats.team;
+      p.setTeam(pState.team, isAlly);
+    }
+    controller.applySnapshot(pState);
   }
 };
 
@@ -123,9 +151,24 @@ net.onDamageEvent = (dmg) => {
   }
 };
 
+let isApplyingRemoteTile = false;
+
+tileMap.onTileDestroyed = (x, y) => {
+  if (isApplyingRemoteTile) return;
+  if (net.isConnected) {
+    net.sendTileDestroy({
+      tileX: x,
+      tileY: y,
+      playerId: localPlayer ? localPlayer.stats.id : 'local',
+    });
+  }
+};
+
 net.onTileDestroy = (tile) => {
-  tileMap.damageTile(tile.tileX, tile.tileY, 999);
+  isApplyingRemoteTile = true;
+  tileMap.destroyTile(tile.tileX, tile.tileY);
   particles.spawnSparks(tile.tileX + 0.5, tile.tileY + 0.5, 0, 3, 8);
+  isApplyingRemoteTile = false;
 };
 
 net.onPlayerLeft = (leftId) => {
@@ -169,7 +212,8 @@ const startMatch = (opts: MenuStartOptions) => {
       net.cachedLobbyPlayers,
       particles,
       fillBots,
-      teamSize
+      teamSize,
+      net.isHost
     );
   } else {
     localPlayer = modeManager.initMatch(
@@ -300,6 +344,16 @@ engine.onUpdate((dt: number) => {
       for (let i = 0; i < modeManager.players.length; i++) {
         const other = modeManager.players[i];
         if (other.stats.id === localPlayer.stats.id || other.stats.isDead) continue;
+        // Do not snap aim assist onto friendly teammates
+        if (
+          localPlayer.stats.team &&
+          other.stats.team &&
+          localPlayer.stats.team !== 'none' &&
+          other.stats.team !== 'none' &&
+          localPlayer.stats.team === other.stats.team
+        ) {
+          continue;
+        }
 
         const edx = other.actor.position.x - localPlayer.actor.position.x;
         const edy = (other.actor.position.y + 0.95) - (localPlayer.actor.position.y + 0.95);
@@ -414,29 +468,55 @@ engine.onUpdate((dt: number) => {
   // Update Local Player
   localPlayer.update(dt, tileMap, rigSystem, effectiveAimAngle);
 
-  // Send 35Hz Client Tick in Online Matches
+  // Send 30Hz Authoritative Broadcast / Client Tick (every 33ms for smooth zero-lag gameplay)
   if (net.isConnected && net.currentRoomId) {
     const now = performance.now();
-    if (now - lastNetTick >= 28) {
+    if (now - lastNetTick >= 33) {
       lastNetTick = now;
-      net.sendTick({
-        id: localPlayer.stats.id,
-        x: localPlayer.actor.position.x,
-        y: localPlayer.actor.position.y,
-        vx: localPlayer.actor.velocity.x,
-        vy: localPlayer.actor.velocity.y,
-        aimAngle: effectiveAimAngle,
-        facingRight: Math.cos(effectiveAimAngle) >= 0,
-        isJetFlying: localPlayer.isJetFlying,
-        isGrounded: localPlayer.actor.isGrounded,
-        isSliding: localPlayer.isSliding,
-        hp: localPlayer.stats.hp,
-        armor: localPlayer.stats.armor,
-        fuel: localPlayer.jetFuel,
-        activeWeapon: localPlayer.stats.activeWeapon,
-        isDead: localPlayer.stats.isDead,
-        timestamp: Date.now(),
-      });
+      if (net.isHost) {
+        // Authoritative Host broadcasts exact state of all entities (host, remote humans, and bots)
+        const allStates: NetworkPlayerState[] = modeManager.players.map((p) => ({
+          id: p.stats.id,
+          x: p.actor.position.x,
+          y: p.actor.position.y,
+          vx: p.actor.velocity.x,
+          vy: p.actor.velocity.y,
+          aimAngle: p.lastAimAngle,
+          facingRight: p.mesh.rootGroup.scale.x >= 0,
+          isJetFlying: p.isJetFlying || p.actor.isJetFlying,
+          isGrounded: p.actor.isGrounded,
+          isSliding: p.isSliding,
+          hp: p.stats.hp,
+          armor: p.stats.armor,
+          fuel: p.jetFuel,
+          activeWeapon: p.stats.activeWeapon,
+          isDead: p.stats.isDead,
+          team: p.stats.team,
+          timestamp: Date.now(),
+        }));
+        net.broadcastHostSnapshot(allStates);
+      } else {
+        // Client sends its local prediction tick to Host
+        net.sendTick({
+          id: localPlayer.stats.id,
+          x: localPlayer.actor.position.x,
+          y: localPlayer.actor.position.y,
+          vx: localPlayer.actor.velocity.x,
+          vy: localPlayer.actor.velocity.y,
+          aimAngle: effectiveAimAngle,
+          facingRight: Math.cos(effectiveAimAngle) >= 0,
+          isJetFlying: localPlayer.isJetFlying,
+          isGrounded: localPlayer.actor.isGrounded,
+          isSliding: localPlayer.isSliding,
+          hp: localPlayer.stats.hp,
+          armor: localPlayer.stats.armor,
+          fuel: localPlayer.jetFuel,
+          activeWeapon: localPlayer.stats.activeWeapon,
+          isDead: localPlayer.stats.isDead,
+          team: localPlayer.stats.team,
+          timestamp: Date.now(),
+        });
+      }
     }
   }
 

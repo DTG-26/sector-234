@@ -1,9 +1,10 @@
+import { getHangarMenuHTML, getModeDisplayName, getMapDisplayName } from './HangarMenuTemplate';
 import { GameModeType, MapId, MatchScoreboardEntry, MovementRigType, OperativeClass, WeaponId } from '../config/types';
 import { RoastReceipt } from './RoastReceipt';
 import { OperativeService } from '../services/OperativeService';
 import { WEAPON_REGISTRY } from '../config/constants';
 import { AudioSynth } from '../core/AudioSynth';
-import { NetworkClient } from '../network/NetworkClient';
+import { P2PNetworkManager } from '../network/P2PNetworkManager';
 import { NetworkLobbyPlayer, RoomStatePayload } from '../network/NetworkTypes';
 
 export interface MenuStartOptions {
@@ -39,12 +40,12 @@ export class MenuOverlay {
 
   private selectedGamerTag: string = 'XAG_001';
   private selectedRig: MovementRigType = MovementRigType.BREACH_BOOSTER;
-  private selectedMode: GameModeType = GameModeType.TEAM_DEATHMATCH;
+  private selectedMode: GameModeType = GameModeType.ODOGWU_STASH;
   private selectedMap: MapId = MapId.BIRNIN_KANO;
   private selectedWeapon: WeaponId = WeaponId.RIFLE_XAG47;
   private selectedSecondaryWeapon: WeaponId = WeaponId.SHOTGUN_AA12;
   private fillBots: boolean = true;
-  private teamSize: number = 3;
+  private teamSize: number = 2;
 
   private radarAnimId: number | null = null;
 
@@ -66,6 +67,7 @@ export class MenuOverlay {
 
   public showMainMenu(onStart: (opts: MenuStartOptions) => void): void {
     this.onStartGameCallback = onStart;
+    document.body.classList.remove('in-match');
     const touchControls = document.getElementById('touch-controls');
     if (touchControls) touchControls.style.display = 'none';
 
@@ -80,737 +82,32 @@ export class MenuOverlay {
     const currentWeaponDef = WEAPON_REGISTRY[this.selectedWeapon] || WEAPON_REGISTRY[WeaponId.RIFLE_XAG47];
     const currentSecWeaponDef = WEAPON_REGISTRY[this.selectedSecondaryWeapon] || WEAPON_REGISTRY[WeaponId.SHOTGUN_AA12];
 
-    this.container.innerHTML = `
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700;800;900&family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap');
+    this.container.innerHTML = getHangarMenuHTML(
+      profile,
+      this.selectedGamerTag,
+      currentWeaponDef,
+      currentSecWeaponDef,
+      this.selectedRig,
+      this.selectedMap,
+      this.selectedMode,
+      this.teamSize,
+      this.fillBots
+    );
 
-        @keyframes subtlePulseGlow {
-          0%, 100% { box-shadow: 0 0 25px rgba(34, 197, 94, 0.45); }
-          50% { box-shadow: 0 0 45px rgba(34, 197, 94, 0.8); }
-        }
-        @keyframes cyanPulseGlow {
-          0%, 100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.35); }
-          50% { box-shadow: 0 0 35px rgba(6, 182, 212, 0.7); }
-        }
+    // Helper: Update home screen display badges
+    const updateHomeDisplays = () => {
+      const modeEl = document.getElementById('home-mode-display');
+      if (modeEl) modeEl.innerText = getModeDisplayName(this.selectedMode, this.teamSize);
 
-        .xag-menu-root {
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(circle at 50% 25%, #0f1724 0%, #080d14 70%, #030508 100%);
-          display: flex;
-          flex-direction: column;
-          z-index: 100;
-          padding: 16px 24px;
-          pointer-events: auto;
-          box-sizing: border-box;
-          overflow-y: auto;
-          font-family: 'Inter', -apple-system, sans-serif;
-          color: #f1f5f9;
-          user-select: none;
-        }
+      const mapEl = document.getElementById('home-map-display');
+      if (mapEl) mapEl.innerText = `${getMapDisplayName(this.selectedMap)} • ${this.fillBots ? 'BOTS ON' : 'PVP ONLY'}`;
 
-        /* Top Header Navigation */
-        .xag-nav-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          background: rgba(15, 23, 42, 0.8);
-          backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 12px;
-          padding: 10px 20px;
-          margin-bottom: 16px;
-          flex-shrink: 0;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-        }
+      const armorySubEl = document.getElementById('nav-armory-sub');
+      const wDef = WEAPON_REGISTRY[this.selectedWeapon] || WEAPON_REGISTRY[WeaponId.RIFLE_XAG47];
+      if (armorySubEl && wDef) armorySubEl.innerText = wDef.name;
+    };
 
-        .xag-nav-brand {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .xag-nav-logo {
-          font-family: 'Chakra Petch', sans-serif;
-          font-size: 22px;
-          font-weight: 900;
-          letter-spacing: 2px;
-          background: linear-gradient(135deg, #ffffff 30%, #4ade80 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-        .xag-nav-pill {
-          background: rgba(34, 197, 94, 0.2);
-          border: 1px solid #22c55e;
-          color: #4ade80;
-          font-size: 10px;
-          font-weight: 800;
-          padding: 3px 8px;
-          border-radius: 6px;
-          letter-spacing: 1px;
-        }
-
-        .xag-profile-chip {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          background: rgba(30, 41, 59, 0.6);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          padding: 6px 14px;
-          border-radius: 20px;
-        }
-        .xag-callsign-display {
-          background: transparent;
-          border: none;
-          color: #ffffff;
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 13px;
-          font-weight: 800;
-          outline: none;
-          width: 100px;
-          letter-spacing: 0.5px;
-        }
-        .xag-callsign-display:focus {
-          border-bottom: 1px solid #38bdf8;
-        }
-
-        .xag-nav-right {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .xag-cash-chip {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background: rgba(16, 185, 129, 0.15);
-          border: 1px solid rgba(16, 185, 129, 0.35);
-          padding: 6px 14px;
-          border-radius: 20px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .xag-cash-chip:hover {
-          background: rgba(16, 185, 129, 0.3);
-          transform: translateY(-1px);
-        }
-        .xag-cash-val {
-          color: #34d399;
-          font-family: 'JetBrains Mono', monospace;
-          font-weight: 900;
-          font-size: 13px;
-        }
-
-        .xag-server-chip {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          background: rgba(34, 197, 94, 0.1);
-          border: 1px solid rgba(34, 197, 94, 0.3);
-          padding: 6px 12px;
-          border-radius: 20px;
-          font-size: 11px;
-          font-weight: 700;
-          color: #4ade80;
-        }
-        .xag-led-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #22c55e;
-          box-shadow: 0 0 8px #22c55e;
-        }
-
-        /* Center Hub Content */
-        .xag-center-hub {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          max-width: 1100px;
-          width: 100%;
-          margin: 0 auto;
-          flex: 1;
-        }
-
-        /* Section Headers */
-        .xag-section-title {
-          font-family: 'Chakra Petch', sans-serif;
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: 2px;
-          color: #94a3b8;
-          text-transform: uppercase;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 4px;
-        }
-
-        /* Mode Selection Grid */
-        .xag-mode-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 14px;
-        }
-
-        .xag-mode-card {
-          background: rgba(15, 23, 42, 0.65);
-          backdrop-filter: blur(12px);
-          border: 1.5px solid rgba(255, 255, 255, 0.08);
-          border-radius: 12px;
-          padding: 16px;
-          cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-          display: flex;
-          flex-direction: column;
-          position: relative;
-          overflow: hidden;
-        }
-        .xag-mode-card:hover {
-          border-color: rgba(56, 189, 248, 0.6);
-          transform: translateY(-2px);
-          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
-        }
-        .xag-mode-card.active {
-          background: linear-gradient(145deg, rgba(16, 185, 129, 0.18) 0%, rgba(15, 23, 42, 0.8) 100%);
-          border: 2px solid #22c55e;
-          box-shadow: 0 0 30px rgba(34, 197, 94, 0.35);
-        }
-
-        .xag-mode-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-        .xag-mode-icon {
-          font-size: 26px;
-        }
-        .xag-mode-badge {
-          font-size: 9px;
-          font-weight: 800;
-          padding: 3px 8px;
-          border-radius: 4px;
-          letter-spacing: 1px;
-          text-transform: uppercase;
-        }
-        .xag-badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
-        .xag-badge-purple { background: rgba(192, 132, 252, 0.2); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.4); }
-        .xag-badge-red { background: rgba(248, 113, 113, 0.2); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.4); }
-        .xag-badge-gold { background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); }
-
-        .xag-mode-title {
-          font-family: 'Chakra Petch', sans-serif;
-          font-size: 15px;
-          font-weight: 800;
-          color: #ffffff;
-          margin-bottom: 6px;
-        }
-        .xag-mode-desc {
-          font-size: 11px;
-          color: #94a3b8;
-          line-height: 1.4;
-          flex: 1;
-        }
-        .xag-mode-status {
-          margin-top: 12px;
-          font-size: 11px;
-          font-weight: 800;
-          color: #64748b;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .xag-mode-card.active .xag-mode-status {
-          color: #22c55e;
-        }
-
-        /* Match Settings Bar (Bots & Map) */
-        .xag-settings-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 14px;
-        }
-
-        .xag-settings-box {
-          background: rgba(15, 23, 42, 0.65);
-          backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 12px;
-          padding: 14px 18px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .xag-toggle-btn {
-          background: #1e293b;
-          border: 1.5px solid #334155;
-          color: #94a3b8;
-          font-family: 'Chakra Petch', sans-serif;
-          font-size: 12px;
-          font-weight: 800;
-          padding: 8px 16px;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .xag-toggle-btn.active {
-          background: rgba(34, 197, 94, 0.2);
-          border-color: #22c55e;
-          color: #4ade80;
-          box-shadow: 0 0 15px rgba(34, 197, 94, 0.3);
-        }
-
-        .xag-map-selector {
-          display: flex;
-          gap: 8px;
-        }
-        .xag-map-pill {
-          background: #1e293b;
-          border: 1.5px solid #334155;
-          color: #94a3b8;
-          font-size: 12px;
-          font-weight: 700;
-          padding: 8px 14px;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .xag-map-pill.active {
-          background: rgba(56, 189, 248, 0.2);
-          border-color: #38bdf8;
-          color: #ffffff;
-          box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
-        }
-
-        /* Action Launch Buttons */
-        .xag-actions-row {
-          display: grid;
-          grid-template-columns: 1.6fr 1.2fr;
-          gap: 14px;
-          margin-top: 4px;
-        }
-
-        .xag-btn-play {
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-          border: none;
-          color: #ffffff;
-          font-family: 'Chakra Petch', sans-serif;
-          font-size: 18px;
-          font-weight: 900;
-          letter-spacing: 2px;
-          padding: 16px 24px;
-          border-radius: 12px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          transition: all 0.2s;
-          animation: subtlePulseGlow 2.5s infinite ease-in-out;
-        }
-        .xag-btn-play:hover {
-          filter: brightness(1.15);
-          transform: translateY(-2px);
-        }
-        .xag-btn-play:active {
-          transform: translateY(1px);
-        }
-
-        .xag-btn-online {
-          background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-          border: 1.5px solid #38bdf8;
-          color: #ffffff;
-          font-family: 'Chakra Petch', sans-serif;
-          font-size: 15px;
-          font-weight: 800;
-          letter-spacing: 1.5px;
-          padding: 16px 20px;
-          border-radius: 12px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          transition: all 0.2s;
-          animation: cyanPulseGlow 3s infinite ease-in-out;
-        }
-        .xag-btn-online:hover {
-          filter: brightness(1.2);
-          transform: translateY(-2px);
-        }
-        .xag-btn-online:active {
-          transform: translateY(1px);
-        }
-
-        /* Bottom Loadout Dock */
-        .xag-loadout-dock {
-          background: rgba(15, 23, 42, 0.75);
-          backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 12px;
-          padding: 14px 18px;
-          display: grid;
-          grid-template-columns: 1fr 1fr 1.5fr auto;
-          gap: 16px;
-          align-items: center;
-          margin-top: 4px;
-        }
-
-        .xag-loadout-item {
-          background: rgba(30, 41, 59, 0.5);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 8px;
-          padding: 8px 12px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .xag-loadout-item:hover {
-          border-color: #38bdf8;
-          background: rgba(30, 41, 59, 0.8);
-        }
-        .xag-swap-badge {
-          background: #334155;
-          color: #94a3b8;
-          font-size: 9px;
-          font-weight: 800;
-          padding: 3px 6px;
-          border-radius: 4px;
-        }
-
-        .xag-rig-selector {
-          display: flex;
-          gap: 6px;
-        }
-        .xag-rig-pill {
-          flex: 1;
-          background: rgba(30, 41, 59, 0.5);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 8px;
-          padding: 8px 6px;
-          text-align: center;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .xag-rig-pill:hover {
-          border-color: #38bdf8;
-        }
-        .xag-rig-pill.active {
-          background: rgba(34, 197, 94, 0.2);
-          border-color: #22c55e;
-          box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
-        }
-        .xag-rig-pill-name {
-          font-size: 11px;
-          font-weight: 800;
-          color: #ffffff;
-        }
-        .xag-rig-pill.active .xag-rig-pill-name {
-          color: #4ade80;
-        }
-
-        .xag-armory-btn {
-          background: rgba(251, 191, 36, 0.15);
-          border: 1px solid #fbbf24;
-          color: #fde047;
-          font-family: 'Chakra Petch', sans-serif;
-          font-size: 12px;
-          font-weight: 800;
-          padding: 10px 14px;
-          border-radius: 8px;
-          cursor: pointer;
-          white-space: nowrap;
-          transition: all 0.15s;
-        }
-        .xag-armory-btn:hover {
-          background: rgba(251, 191, 36, 0.3);
-        }
-
-        /* Mobile Adjustments (< 860px) */
-        @media screen and (max-width: 860px) {
-          .xag-menu-root {
-            padding: 10px;
-          }
-          .xag-nav-header {
-            padding: 8px 12px;
-            margin-bottom: 10px;
-          }
-          .xag-mode-grid {
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-          }
-          .xag-settings-row {
-            grid-template-columns: 1fr;
-            gap: 10px;
-          }
-          .xag-actions-row {
-            grid-template-columns: 1fr;
-            gap: 10px;
-          }
-          .xag-loadout-dock {
-            grid-template-columns: 1fr;
-            gap: 10px;
-          }
-          .xag-rig-selector {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-          }
-        }
-      </style>
-
-      <div class="xag-menu-root">
-        <!-- Top Navigation Header -->
-        <header class="xag-nav-header">
-          <div class="xag-nav-brand">
-            <span class="xag-nav-logo">SECTOR 234</span>
-            <span class="xag-nav-pill">PROTOCOL ZERO</span>
-          </div>
-
-          <div class="xag-profile-chip" title="Click to edit your operative callsign">
-            <span style="font-size: 12px; color: #94a3b8;">CALLSIGN:</span>
-            <input id="xag-callsign-input" class="xag-callsign-display" type="text" maxlength="14" value="${this.selectedGamerTag}" spellcheck="false" />
-            <span style="font-size: 10px; background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 800; padding: 2px 6px; border-radius: 4px;">RANK ${profile.rank}</span>
-          </div>
-
-          <div class="xag-nav-right">
-            <div id="btn-top-vault" class="xag-cash-chip" title="Open Syndicate Offshore Vault">
-              <span>💰</span>
-              <span class="xag-cash-val">₦${profile.cash_balance.toLocaleString()}</span>
-            </div>
-            <div class="xag-server-chip">
-              <div class="xag-led-dot"></div>
-              <span>ONLINE</span>
-            </div>
-          </div>
-        </header>
-
-        <!-- Center Battle Hub -->
-        <main class="xag-center-hub">
-
-          <!-- 1. Mode Selection Grid -->
-          <section>
-            <div class="xag-section-title">
-              <span>⚔️ SELECT GAME MODE</span>
-            </div>
-            <div class="xag-mode-grid">
-
-              <!-- 3v3 Team Deathmatch -->
-              <div class="xag-mode-card ${this.selectedMode === GameModeType.TEAM_DEATHMATCH && this.teamSize === 3 ? 'active' : ''}" data-mode="TEAM_DEATHMATCH" data-teamsize="3">
-                <div class="xag-mode-header">
-                  <span class="xag-mode-icon">👥</span>
-                  <span class="xag-mode-badge xag-badge-blue">COMPETITIVE</span>
-                </div>
-                <div class="xag-mode-title">3v3 TEAM DEATHMATCH</div>
-                <div class="xag-mode-desc">Blue vs Red tactical showdown. First team to 25 eliminations wins.</div>
-                <div class="xag-mode-status">
-                  <span>${this.selectedMode === GameModeType.TEAM_DEATHMATCH && this.teamSize === 3 ? '✓ SELECTED' : '○ CLICK TO SELECT'}</span>
-                </div>
-              </div>
-
-              <!-- 5v5 Team Deathmatch -->
-              <div class="xag-mode-card ${this.selectedMode === GameModeType.TEAM_DEATHMATCH && this.teamSize === 5 ? 'active' : ''}" data-mode="TEAM_DEATHMATCH" data-teamsize="5">
-                <div class="xag-mode-header">
-                  <span class="xag-mode-icon">⚔️</span>
-                  <span class="xag-mode-badge xag-badge-purple">10-PLAYER WAR</span>
-                </div>
-                <div class="xag-mode-title">5v5 TEAM DEATHMATCH</div>
-                <div class="xag-mode-desc">Full squad battleground. First team to 40 eliminations claims the sector.</div>
-                <div class="xag-mode-status">
-                  <span>${this.selectedMode === GameModeType.TEAM_DEATHMATCH && this.teamSize === 5 ? '✓ SELECTED' : '○ CLICK TO SELECT'}</span>
-                </div>
-              </div>
-
-              <!-- Free For All -->
-              <div class="xag-mode-card ${this.selectedMode === GameModeType.FREE_FOR_ALL ? 'active' : ''}" data-mode="FREE_FOR_ALL" data-teamsize="1">
-                <div class="xag-mode-header">
-                  <span class="xag-mode-icon">💀</span>
-                  <span class="xag-mode-badge xag-badge-red">DEATHMATCH</span>
-                </div>
-                <div class="xag-mode-title">FREE FOR ALL (SOLO)</div>
-                <div class="xag-mode-desc">Every operative for themselves. Eliminate everyone. First to 20 kills wins.</div>
-                <div class="xag-mode-status">
-                  <span>${this.selectedMode === GameModeType.FREE_FOR_ALL ? '✓ SELECTED' : '○ CLICK TO SELECT'}</span>
-                </div>
-              </div>
-
-              <!-- Odogwu Heist -->
-              <div class="xag-mode-card ${this.selectedMode === GameModeType.ODOGWU_STASH ? 'active' : ''}" data-mode="ODOGWU_STASH" data-teamsize="3">
-                <div class="xag-mode-header">
-                  <span class="xag-mode-icon">💰</span>
-                  <span class="xag-mode-badge xag-badge-gold">HEIST OBJECTIVE</span>
-                </div>
-                <div class="xag-mode-title">ODOGWU HEIST</div>
-                <div class="xag-mode-desc">Breach the mud/concrete central vault, grab the cash bag & evac on the chopper.</div>
-                <div class="xag-mode-status">
-                  <span>${this.selectedMode === GameModeType.ODOGWU_STASH ? '✓ SELECTED' : '○ CLICK TO SELECT'}</span>
-                </div>
-              </div>
-
-            </div>
-          </section>
-
-          <!-- 2. Match Settings (Bot Configuration & Map) -->
-          <section class="xag-settings-row">
-            <!-- Bot Fill Toggle -->
-            <div class="xag-settings-box">
-              <div>
-                <div style="font-weight: 800; font-size: 13px; color: #ffffff; margin-bottom: 2px;">🤖 PLAY WITH BOTS</div>
-                <div style="font-size: 11px; color: #94a3b8;">Fill empty slots with tactical AI bots</div>
-              </div>
-              <button id="btn-toggle-bots" type="button" class="xag-toggle-btn ${this.fillBots ? 'active' : ''}">
-                <span id="bot-toggle-text">${this.fillBots ? '✓ BOTS: ON' : '✕ BOTS: OFF'}</span>
-              </button>
-            </div>
-
-            <!-- Map Selection -->
-            <div class="xag-settings-box">
-              <div>
-                <div style="font-weight: 800; font-size: 13px; color: #ffffff; margin-bottom: 2px;">🗺️ SECTOR MAP</div>
-                <div style="font-size: 11px; color: #94a3b8;">Select your battle theater</div>
-              </div>
-              <div class="xag-map-selector">
-                <button type="button" class="xag-map-pill ${this.selectedMap === MapId.BIRNIN_KANO ? 'active' : ''}" data-map="BIRNIN_KANO">
-                  🏰 BIRNIN KANO
-                </button>
-                <button type="button" class="xag-map-pill ${this.selectedMap === MapId.LAGOS_GOSLOW ? 'active' : ''}" data-map="LAGOS_GOSLOW">
-                  🚗 LAGOS GO-SLOW
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <!-- 3. Primary Actions (Play Solo/Bots vs Multiplayer Lobby) -->
-          <section class="xag-actions-row">
-            <button id="menu-deploy-btn" type="button" class="xag-btn-play">
-              <span style="font-size: 22px;">▶</span>
-              <span>PLAY MATCH (SOLO / BOTS)</span>
-            </button>
-            <button id="menu-online-btn" type="button" class="xag-btn-online">
-              <span style="font-size: 20px;">⚡</span>
-              <span>MULTIPLAYER LOBBY (PLAY ONLINE)</span>
-            </button>
-          </section>
-
-          <!-- 4. Loadout Dock -->
-          <section>
-            <div class="xag-section-title">
-              <span>🎯 OPERATIVE LOADOUT</span>
-            </div>
-            <div class="xag-loadout-dock">
-              <!-- Primary Weapon -->
-              <div id="weapon-select-card" class="xag-loadout-item" title="Click to swap weapon">
-                <div>
-                  <div style="font-size: 9px; color: #94a3b8; font-weight: 700;">PRIMARY WEAPON</div>
-                  <div id="weapon-name-display" style="font-size: 12px; font-weight: 800; color: #ffffff;">${currentWeaponDef.name}</div>
-                </div>
-                <span id="btn-cycle-weapon" class="xag-swap-badge">SWAP</span>
-              </div>
-
-              <!-- Secondary Weapon -->
-              <div id="sec-weapon-select-card" class="xag-loadout-item" title="Click to swap secondary">
-                <div>
-                  <div style="font-size: 9px; color: #94a3b8; font-weight: 700;">SECONDARY WEAPON</div>
-                  <div id="sec-weapon-name-display" style="font-size: 12px; font-weight: 800; color: #ffffff;">${currentSecWeaponDef.name}</div>
-                </div>
-                <span id="btn-cycle-sec-weapon" class="xag-swap-badge">SWAP</span>
-              </div>
-
-              <!-- Mobility Rig Selector -->
-              <div class="xag-rig-selector">
-                <div class="xag-rig-pill ${this.selectedRig === MovementRigType.PHASE_DASH ? 'active' : ''}" data-rig="${MovementRigType.PHASE_DASH}" title="Specter: Phase Dash through thin cover">
-                  <div style="font-size: 14px;">⚡</div>
-                  <div class="xag-rig-pill-name">SPECTER</div>
-                </div>
-                <div class="xag-rig-pill ${this.selectedRig === MovementRigType.BREACH_BOOSTER ? 'active' : ''}" data-rig="${MovementRigType.BREACH_BOOSTER}" title="Vanguard: Smashes mud/concrete walls">
-                  <div style="font-size: 14px;">🛡️</div>
-                  <div class="xag-rig-pill-name">VANGUARD</div>
-                </div>
-                <div class="xag-rig-pill ${this.selectedRig === MovementRigType.GLITCH_ANCHOR ? 'active' : ''}" data-rig="${MovementRigType.GLITCH_ANCHOR}" title="Chronos: Snap-back teleport beacon">
-                  <div style="font-size: 14px;">⏱️</div>
-                  <div class="xag-rig-pill-name">CHRONOS</div>
-                </div>
-                <div class="xag-rig-pill ${this.selectedRig === MovementRigType.OVERDRIVE_SLIDE ? 'active' : ''}" data-rig="${MovementRigType.OVERDRIVE_SLIDE}" title="Striker: Kinetic slide and wall kick">
-                  <div style="font-size: 14px;">🚀</div>
-                  <div class="xag-rig-pill-name">STRIKER</div>
-                </div>
-              </div>
-
-              <!-- Armory & Vault -->
-              <button id="btn-open-dossier" type="button" class="xag-armory-btn">
-                <span>🛒 ARMORY & SHOP</span>
-              </button>
-            </div>
-          </section>
-
-        </main>
-      </div>
-    `;
-
-    // 1. Hook Mode Cards
-    const modeCards = this.container.querySelectorAll<HTMLElement>('.xag-mode-card');
-    modeCards.forEach((card) => {
-      card.addEventListener('click', () => {
-        modeCards.forEach((c) => {
-          c.classList.remove('active');
-          const status = c.querySelector('.xag-mode-status span');
-          if (status) status.textContent = '○ CLICK TO SELECT';
-        });
-
-        card.classList.add('active');
-        const activeStatus = card.querySelector('.xag-mode-status span');
-        if (activeStatus) activeStatus.textContent = '✓ SELECTED';
-
-        this.selectedMode = card.getAttribute('data-mode') as GameModeType;
-        const ts = card.getAttribute('data-teamsize');
-        this.teamSize = ts ? parseInt(ts, 10) : 3;
-
-        this.audio?.playUISelect();
-      });
-    });
-
-    // 2. Hook Bot Toggle
-    const botBtn = document.getElementById('btn-toggle-bots');
-    const botText = document.getElementById('bot-toggle-text');
-    if (botBtn) {
-      botBtn.addEventListener('click', () => {
-        this.fillBots = !this.fillBots;
-        botBtn.classList.toggle('active', this.fillBots);
-        if (botText) {
-          botText.textContent = this.fillBots ? '✓ BOTS: ON' : '✕ BOTS: OFF';
-        }
-        this.audio?.playUISelect();
-      });
-    }
-
-    // 3. Hook Map Pills
-    const mapPills = this.container.querySelectorAll<HTMLButtonElement>('.xag-map-pill');
-    mapPills.forEach((pill) => {
-      pill.addEventListener('click', () => {
-        mapPills.forEach((p) => p.classList.remove('active'));
-        pill.classList.add('active');
-        this.selectedMap = pill.getAttribute('data-map') as MapId;
-        this.audio?.playUISelect();
-      });
-    });
-
-    // 4. Hook Rig Pills
-    const rigPills = this.container.querySelectorAll<HTMLElement>('.xag-rig-pill');
-    rigPills.forEach((pill) => {
-      pill.addEventListener('click', () => {
-        rigPills.forEach((p) => p.classList.remove('active'));
-        pill.classList.add('active');
-        this.selectedRig = pill.getAttribute('data-rig') as MovementRigType;
-        this.audio?.playUISelect();
-      });
-    });
-
-    // 5. Hook Callsign Input
+    // 1. Hook Callsign Input
     const callsignInput = document.getElementById('xag-callsign-input') as HTMLInputElement;
     if (callsignInput) {
       callsignInput.addEventListener('input', () => {
@@ -823,58 +120,255 @@ export class MenuOverlay {
       });
     }
 
-    // 6. Hook Weapons
-    const updateWeaponDisplay = () => {
-      const def = WEAPON_REGISTRY[this.selectedWeapon] || WEAPON_REGISTRY[WeaponId.RIFLE_XAG47];
-      const nameEl = document.getElementById('weapon-name-display');
-      if (nameEl) nameEl.innerText = def.name;
-    };
-    const cycleWeapon = (e: Event) => {
+    // 2. Hook Audio & Settings
+    document.getElementById('btn-audio-toggle')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      const idx = WEAPON_CYCLE.indexOf(this.selectedWeapon);
-      const nextIdx = (idx + 1) % WEAPON_CYCLE.length;
-      this.selectedWeapon = WEAPON_CYCLE[nextIdx];
-      updateWeaponDisplay();
       this.audio?.playUISelect();
-    };
-    document.getElementById('weapon-select-card')?.addEventListener('click', cycleWeapon);
-    document.getElementById('btn-cycle-weapon')?.addEventListener('click', cycleWeapon);
-
-    const updateSecWeaponDisplay = () => {
-      const def = WEAPON_REGISTRY[this.selectedSecondaryWeapon] || WEAPON_REGISTRY[WeaponId.SHOTGUN_AA12];
-      const nameEl = document.getElementById('sec-weapon-name-display');
-      if (nameEl) nameEl.innerText = def.name;
-    };
-    const cycleSecWeapon = (e: Event) => {
+    });
+    document.getElementById('btn-open-settings')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      const idx = WEAPON_CYCLE.indexOf(this.selectedSecondaryWeapon);
-      const nextIdx = (idx + 1) % WEAPON_CYCLE.length;
-      this.selectedSecondaryWeapon = WEAPON_CYCLE[nextIdx];
-      updateSecWeaponDisplay();
       this.audio?.playUISelect();
-    };
-    document.getElementById('sec-weapon-select-card')?.addEventListener('click', cycleSecWeapon);
-    document.getElementById('btn-cycle-sec-weapon')?.addEventListener('click', cycleSecWeapon);
+      this.showDossierModal();
+    });
 
-    // 7. Hook Armory / Shop
-    const openArmory = (e: Event) => {
+    // 3. Hook Maps & Modes Dedicated Modal
+    const mapsModal = document.getElementById('xag-maps-modal');
+    const openMapsModal = (e: Event) => {
+      e.stopPropagation();
+      this.audio?.playUISelect();
+      if (mapsModal) mapsModal.classList.add('open');
+      this.startRadarAnimation();
+    };
+    const closeMapsModal = (e?: Event) => {
+      if (e) e.stopPropagation();
+      this.audio?.playUISelect();
+      if (mapsModal) mapsModal.classList.remove('open');
+      updateHomeDisplays();
+    };
+
+    document.getElementById('btn-open-maps-modal')?.addEventListener('click', openMapsModal);
+    document.getElementById('btn-close-maps-modal')?.addEventListener('click', closeMapsModal);
+    document.getElementById('btn-confirm-maps-modal')?.addEventListener('click', closeMapsModal);
+    mapsModal?.addEventListener('click', (e) => {
+      if (e.target === mapsModal) closeMapsModal();
+    });
+
+    // Hook Theater (Map) Cards
+    const theaterCards = this.container.querySelectorAll<HTMLElement>('.xag-theater-card');
+    theaterCards.forEach((card) => {
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        theaterCards.forEach((c) => c.classList.remove('active'));
+        card.classList.add('active');
+        this.selectedMap = card.getAttribute('data-map') as MapId;
+        this.audio?.playUISelect();
+        updateHomeDisplays();
+      });
+    });
+
+    // Hook Game Mode Cards
+    const modeCards = this.container.querySelectorAll<HTMLElement>('.xag-mode-card');
+    modeCards.forEach((card) => {
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        modeCards.forEach((c) => c.classList.remove('active'));
+        card.classList.add('active');
+        this.selectedMode = card.getAttribute('data-mode') as GameModeType;
+        this.teamSize = parseInt(card.getAttribute('data-teamsize') || '2', 10);
+        this.audio?.playUISelect();
+        updateHomeDisplays();
+      });
+    });
+
+    // Hook Infiltration Bots Toggle
+    const botToggleBtn = document.getElementById('btn-toggle-bots');
+    botToggleBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.fillBots = !this.fillBots;
+      const statusPill = document.getElementById('modal-bot-status-pill');
+      if (statusPill) {
+        statusPill.innerText = this.fillBots ? '🤖 BOTS: ENABLED' : '✕ PVP ONLY';
+        statusPill.className = `xag-toggle-pill ${this.fillBots ? 'on' : 'off'}`;
+      }
+      this.audio?.playUISelect();
+      updateHomeDisplays();
+    });
+
+    // 4. Hook Armory & Loadout Dedicated Modal
+    const armoryModal = document.getElementById('xag-armory-modal');
+    const openArmoryModal = (e: Event) => {
       e.stopPropagation();
       this.audio?.playCashPickup();
-      this.showDossierModal();
+      if (armoryModal) armoryModal.classList.add('open');
+      renderArmoryPanels();
     };
-    document.getElementById('btn-open-dossier')?.addEventListener('click', openArmory);
-    document.getElementById('btn-top-vault')?.addEventListener('click', openArmory);
+    const closeArmoryModal = (e?: Event) => {
+      if (e) e.stopPropagation();
+      this.audio?.playUISelect();
+      if (armoryModal) armoryModal.classList.remove('open');
+      updateHomeDisplays();
+    };
 
-    // 8. Hook Launch Buttons
+    document.getElementById('btn-open-armory')?.addEventListener('click', openArmoryModal);
+    document.getElementById('btn-top-vault')?.addEventListener('click', openArmoryModal);
+    document.getElementById('btn-close-armory-modal')?.addEventListener('click', closeArmoryModal);
+    document.getElementById('btn-save-armory-modal')?.addEventListener('click', closeArmoryModal);
+    armoryModal?.addEventListener('click', (e) => {
+      if (e.target === armoryModal) closeArmoryModal();
+    });
+
+    // Armory Tabs
+    const tabPrimary = document.getElementById('tab-primary-btn');
+    const tabSecondary = document.getElementById('tab-secondary-btn');
+    const tabRigs = document.getElementById('tab-rigs-btn');
+    const panelPrimary = document.getElementById('armory-panel-primary');
+    const panelSecondary = document.getElementById('armory-panel-secondary');
+    const panelRigs = document.getElementById('armory-panel-rigs');
+
+    const switchArmoryTab = (tab: 'primary' | 'secondary' | 'rigs') => {
+      [tabPrimary, tabSecondary, tabRigs].forEach((t) => t?.classList.remove('active'));
+      if (panelPrimary) panelPrimary.style.display = tab === 'primary' ? 'grid' : 'none';
+      if (panelSecondary) panelSecondary.style.display = tab === 'secondary' ? 'grid' : 'none';
+      if (panelRigs) panelRigs.style.display = tab === 'rigs' ? 'grid' : 'none';
+
+      if (tab === 'primary') tabPrimary?.classList.add('active');
+      if (tab === 'secondary') tabSecondary?.classList.add('active');
+      if (tab === 'rigs') tabRigs?.classList.add('active');
+      this.audio?.playUISelect();
+    };
+
+    tabPrimary?.addEventListener('click', () => switchArmoryTab('primary'));
+    tabSecondary?.addEventListener('click', () => switchArmoryTab('secondary'));
+    tabRigs?.addEventListener('click', () => switchArmoryTab('rigs'));
+
+    // Dynamic Armory Renderer
+    const renderArmoryPanels = () => {
+      const service = OperativeService.getInstance();
+
+      // Render Primary Panel
+      if (panelPrimary) {
+        panelPrimary.innerHTML = WEAPON_CYCLE.map((wId) => {
+          const def = WEAPON_REGISTRY[wId];
+          const isEquipped = this.selectedWeapon === wId;
+          const isUnlocked = service.isWeaponUnlocked(wId);
+          return `
+            <div class="xag-armory-card ${isEquipped ? 'equipped' : ''}" data-armory-weapon="${wId}" data-slot="primary">
+              <div class="xag-w-header">
+                <span class="xag-w-name">${def.name}</span>
+                <span class="xag-w-status ${isEquipped ? 'active' : isUnlocked ? 'unlocked' : 'locked'}">
+                  ${isEquipped ? 'EQUIPPED' : isUnlocked ? 'EQUIP' : 'BUY ₦' + (def.damage * 10000).toLocaleString()}
+                </span>
+              </div>
+              <div class="xag-w-desc">${def.description}</div>
+              <div class="xag-w-stats">
+                <span>DMG: <b>${def.damage}</b></span>
+                <span>RATE: <b>${(1 / def.fireInterval).toFixed(1)}/s</b></span>
+                <span>MAG: <b>${def.magSize}</b></span>
+                <span>WALL: <b>${def.wallDmgMultiplier}x</b></span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        panelPrimary.querySelectorAll<HTMLElement>('.xag-armory-card').forEach((card) => {
+          card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const wId = card.getAttribute('data-armory-weapon') as WeaponId;
+            const def = WEAPON_REGISTRY[wId];
+            if (!service.isWeaponUnlocked(wId)) {
+              const cost = def.damage * 10000;
+              if (service.unlockWeapon(wId, cost)) {
+                this.audio?.playCashPickup();
+                this.selectedWeapon = wId;
+                renderArmoryPanels();
+                updateHomeDisplays();
+              } else {
+                alert('Insufficient Offshore Vault balance!');
+              }
+            } else {
+              this.selectedWeapon = wId;
+              this.audio?.playUISelect();
+              renderArmoryPanels();
+              updateHomeDisplays();
+            }
+          });
+        });
+      }
+
+      // Render Secondary Panel
+      if (panelSecondary) {
+        panelSecondary.innerHTML = WEAPON_CYCLE.map((wId) => {
+          const def = WEAPON_REGISTRY[wId];
+          const isEquipped = this.selectedSecondaryWeapon === wId;
+          const isUnlocked = service.isWeaponUnlocked(wId);
+          return `
+            <div class="xag-armory-card ${isEquipped ? 'equipped' : ''}" data-armory-weapon="${wId}" data-slot="secondary">
+              <div class="xag-w-header">
+                <span class="xag-w-name">${def.name}</span>
+                <span class="xag-w-status ${isEquipped ? 'active' : isUnlocked ? 'unlocked' : 'locked'}">
+                  ${isEquipped ? 'EQUIPPED' : isUnlocked ? 'EQUIP' : 'BUY ₦' + (def.damage * 10000).toLocaleString()}
+                </span>
+              </div>
+              <div class="xag-w-desc">${def.description}</div>
+              <div class="xag-w-stats">
+                <span>DMG: <b>${def.damage}</b></span>
+                <span>RATE: <b>${(1 / def.fireInterval).toFixed(1)}/s</b></span>
+                <span>MAG: <b>${def.magSize}</b></span>
+                <span>WALL: <b>${def.wallDmgMultiplier}x</b></span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        panelSecondary.querySelectorAll<HTMLElement>('.xag-armory-card').forEach((card) => {
+          card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const wId = card.getAttribute('data-armory-weapon') as WeaponId;
+            const def = WEAPON_REGISTRY[wId];
+            if (!service.isWeaponUnlocked(wId)) {
+              const cost = def.damage * 10000;
+              if (service.unlockWeapon(wId, cost)) {
+                this.audio?.playCashPickup();
+                this.selectedSecondaryWeapon = wId;
+                renderArmoryPanels();
+              } else {
+                alert('Insufficient Offshore Vault balance!');
+              }
+            } else {
+              this.selectedSecondaryWeapon = wId;
+              this.audio?.playUISelect();
+              renderArmoryPanels();
+            }
+          });
+        });
+      }
+
+      // Movement Rig Selection in Armory
+      panelRigs?.querySelectorAll<HTMLElement>('.xag-rig-card-full').forEach((card) => {
+        card.addEventListener('click', (e) => {
+          e.stopPropagation();
+          panelRigs.querySelectorAll('.xag-rig-card-full').forEach((c) => c.classList.remove('active'));
+          card.classList.add('active');
+          this.selectedRig = card.getAttribute('data-rig') as MovementRigType;
+          this.audio?.playUISelect();
+        });
+      });
+    };
+
+    // 5. Hook Multiplayer & Squad
+    document.getElementById('btn-open-multiplayer')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openMultiplayerLobby();
+    });
+
+    // 6. Hook Deploy Action Button
     document.getElementById('menu-deploy-btn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.executeDeploy(false);
     });
 
-    document.getElementById('menu-online-btn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.openMultiplayerLobby();
-    });
+    // Pre-start radar loop in background so canvases are ready
+    this.startRadarAnimation();
   }
 
   private executeDeploy(isMultiplayer = false, roomId?: string, fillBotsOverride?: boolean): void {
@@ -900,6 +394,7 @@ export class MenuOverlay {
       }
     } catch (_) {}
     window.scrollTo(0, 1);
+    document.body.classList.add('in-match');
 
     this.container.innerHTML = '';
     const touchControls = document.getElementById('touch-controls');
@@ -924,7 +419,7 @@ export class MenuOverlay {
   }
 
   private openMultiplayerLobby(): void {
-    const net = NetworkClient.getInstance();
+    const net = P2PNetworkManager.getInstance();
 
     const existing = document.getElementById('xag-lobby-overlay');
     if (existing) existing.remove();
@@ -950,27 +445,39 @@ export class MenuOverlay {
     const renderLobbyContent = (roomState?: RoomStatePayload, errorMsg?: string) => {
       if (roomState && roomState.roomId) {
         const isHost = roomState.isHost;
-        const myPlayer = roomState.players.find(p => p.id === roomState.yourPlayerId);
+        const myPlayer = roomState.players.find((p) => p.id === roomState.yourPlayerId);
         const isReady = myPlayer ? myPlayer.isReady : false;
+
+        const pingLabel = net.isHost
+          ? '👑 HOST (0ms LAG)'
+          : net.isLocalHotspot
+          ? '🟢 <5ms (HOTSPOT)'
+          : `🟡 ${net.ping || 18}ms (P2P)`;
 
         overlay.innerHTML = `
           <div style="background: #090d16; border: 1px solid #06b6d4; box-shadow: 0 0 35px rgba(6, 182, 212, 0.35); max-width: 580px; width: 100%; border-radius: 8px; overflow: hidden; padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-bottom: 16px;">
               <div>
-                <div style="font-size: 11px; color: #06b6d4; font-weight: 700; letter-spacing: 2px;">⚡ LIVE TACTICAL ROOM</div>
-                <div style="font-size: 24px; font-weight: 900; letter-spacing: 4px; color: #ffffff;">CODE: <span style="color: #38bdf8; text-shadow: 0 0 10px rgba(56, 189, 248, 0.7);">${roomState.roomId}</span></div>
+                <div style="font-size: 11px; color: #06b6d4; font-weight: 700; letter-spacing: 2px;">⚡ P2P HOTSPOT ARENA</div>
+                <div style="font-size: 24px; font-weight: 900; letter-spacing: 4px; color: #ffffff;">ROOM CODE: <span style="color: #38bdf8; text-shadow: 0 0 10px rgba(56, 189, 248, 0.7);">${roomState.roomId}</span></div>
               </div>
               <div style="display: flex; gap: 8px; align-items: center;">
                 <button id="lobby-copy-btn" style="background: #1e293b; border: 1px solid #06b6d4; color: #38bdf8; padding: 6px 12px; font-size: 11px; font-weight: 700; cursor: pointer; border-radius: 4px; font-family: inherit;">📋 COPY CODE</button>
-                <div style="font-size: 10px; background: rgba(34, 197, 94, 0.15); border: 1px solid #22c55e; color: #4ade80; padding: 4px 8px; border-radius: 4px;">🟢 ${net.ping || 20}ms</div>
+                <div style="font-size: 10px; background: rgba(34, 197, 94, 0.15); border: 1px solid #22c55e; color: #4ade80; padding: 4px 8px; border-radius: 4px;">${pingLabel}</div>
               </div>
             </div>
 
             <div style="display: flex; gap: 12px; font-size: 11px; color: #94a3b8; margin-bottom: 16px; background: #0f172a; padding: 8px 12px; border-radius: 4px; border: 1px solid #1e293b; align-items: center; justify-content: space-between;">
-              <div style="display: flex; gap: 12px; align-items: center;">
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                 <div>MAP: <span style="color: #ffffff; font-weight: 700;">${this.selectedMap === MapId.LAGOS_GOSLOW ? 'LAGOS GO-SLOW' : 'BIRNIN KANO'}</span></div>
-                <div>MODE: <span style="color: #ffffff; font-weight: 700;">${this.selectedMode}</span></div>
-                <div>OPERATIVES: <span style="color: #38bdf8; font-weight: 700;">${roomState.players.length} / 6</span></div>
+                <div>MODE: <span style="color: #38bdf8; font-weight: 800;">${
+                  this.selectedMode === GameModeType.ODOGWU_STASH && this.teamSize === 2
+                    ? '2v2 SQUAD HEIST'
+                    : (this.selectedMode === GameModeType.TEAM_DEATHMATCH && this.teamSize === 2
+                      ? '2v2 TDM'
+                      : (this.selectedMode === GameModeType.ODOGWU_STASH ? 'SOLO HEIST' : this.selectedMode.replace('_', ' ')))
+                }</span></div>
+                <div>OPERATIVES: <span style="color: #4ade80; font-weight: 700;">${roomState.players.length} / ${this.teamSize === 2 ? 4 : 6}</span></div>
               </div>
               <div>
                 ${isHost ? `
@@ -989,7 +496,7 @@ export class MenuOverlay {
             <div style="margin-bottom: 20px;">
               <div style="font-size: 10px; font-weight: 700; color: #64748b; letter-spacing: 2px; margin-bottom: 8px;">CONNECTED OPERATIVES:</div>
               <div style="display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto;">
-                ${roomState.players.map(p => `
+                ${roomState.players.map((p) => `
                   <div style="display: flex; align-items: center; justify-content: space-between; background: ${p.id === roomState.yourPlayerId ? 'rgba(6, 182, 212, 0.12)' : '#0f172a'}; border: 1px solid ${p.id === roomState.yourPlayerId ? '#06b6d4' : '#1e293b'}; padding: 8px 12px; border-radius: 4px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                       <span style="font-weight: 800; color: ${p.id === roomState.yourPlayerId ? '#38bdf8' : '#ffffff'}; font-size: 13px;">${p.name} ${p.isHost ? '<span style="color: #eab308; font-size: 10px;">[HOST]</span>' : ''}</span>
@@ -1045,17 +552,18 @@ export class MenuOverlay {
         });
 
         document.getElementById('lobby-leave-btn')?.addEventListener('click', () => {
+          net.leaveRoom();
           overlay.remove();
         });
 
       } else {
-        // Initial Room Picker (Create or Join)
+        // Initial Room Picker (Host or Join)
         overlay.innerHTML = `
           <div style="background: #090d16; border: 1px solid #06b6d4; box-shadow: 0 0 35px rgba(6, 182, 212, 0.35); max-width: 480px; width: 100%; border-radius: 8px; overflow: hidden; padding: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-bottom: 20px;">
               <div>
-                <div style="font-size: 11px; color: #06b6d4; font-weight: 700; letter-spacing: 2px;">⚡ MULTIPLAYER ARENA</div>
-                <div style="font-size: 20px; font-weight: 900; letter-spacing: 3px; color: #ffffff;">ONLINE LOBBY</div>
+                <div style="font-size: 11px; color: #06b6d4; font-weight: 700; letter-spacing: 2px;">⚡ WEBRTC DIRECT P2P</div>
+                <div style="font-size: 20px; font-weight: 900; letter-spacing: 3px; color: #ffffff;">HOTSPOT ARENA</div>
               </div>
               <button id="lobby-close-btn" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer;">✕</button>
             </div>
@@ -1063,30 +571,30 @@ export class MenuOverlay {
             ${errorMsg ? `
               <div style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; padding: 10px 14px; font-size: 11px; border-radius: 6px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
                 <span>⚠️ ${errorMsg}</span>
-                <button id="btn-lobby-retry" style="background: #ef4444; border: none; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 800; cursor: pointer; font-family: inherit;">RETRY</button>
               </div>
             ` : ''}
 
             <div style="margin-bottom: 20px;">
               <button id="lobby-create-btn" style="width: 100%; background: linear-gradient(135deg, #0284c7, #0369a1); border: 1px solid #38bdf8; color: #ffffff; padding: 14px; font-weight: 900; font-size: 14px; letter-spacing: 2px; cursor: pointer; border-radius: 4px; font-family: inherit; transition: transform 0.1s;">
-                CREATE NEW ARENA ROOM
+                ⚡ HOST ARENA MATCH (0ms LAG)
               </button>
+              <div style="font-size: 10px; color: #94a3b8; margin-top: 6px; text-align: center;">Host runs authoritative simulation locally. Friends connect directly.</div>
             </div>
 
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #64748b; font-size: 11px;">
               <div style="flex: 1; height: 1px; background: #1e293b;"></div>
-              <span>OR JOIN WITH CODE</span>
+              <span>OR JOIN WITH 4-DIGIT CODE</span>
               <div style="flex: 1; height: 1px; background: #1e293b;"></div>
             </div>
 
             <div style="display: flex; gap: 10px; margin-bottom: 14px;">
-              <input id="lobby-code-input" placeholder="4-LETTER CODE" maxlength="4" style="flex: 1; background: #0f172a; border: 1px solid #334155; color: #38bdf8; font-size: 18px; font-weight: 900; letter-spacing: 4px; text-transform: uppercase; padding: 10px 14px; border-radius: 4px; text-align: center; font-family: inherit; outline: none;" />
+              <input id="lobby-code-input" placeholder="4-DIGIT CODE (e.g. 2349)" maxlength="4" style="flex: 1; background: #0f172a; border: 1px solid #334155; color: #38bdf8; font-size: 18px; font-weight: 900; letter-spacing: 4px; text-transform: uppercase; padding: 10px 14px; border-radius: 4px; text-align: center; font-family: inherit; outline: none;" />
               <button id="lobby-join-btn" style="background: #1e293b; border: 1px solid #06b6d4; color: #38bdf8; font-weight: 800; font-size: 13px; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-family: inherit;">JOIN</button>
             </div>
 
             <div style="font-size: 11px; color: #64748b; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
               <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #22c55e;"></span>
-              <span>Live Railway Cloud Multiplayer (wss://sector-234-production.up.railway.app)</span>
+              <span>Direct WebRTC UDP-style DataChannels (<5ms local Wi-Fi / Hotspot)</span>
             </div>
           </div>
         `;
@@ -1095,49 +603,58 @@ export class MenuOverlay {
           overlay.remove();
         });
 
-        document.getElementById('btn-lobby-retry')?.addEventListener('click', () => {
-          renderLobbyContent();
-          net.connect().then((connected) => {
-            if (!connected) {
-              renderLobbyContent(undefined, `Unable to reach live arena server (${net.serverUrl}).`);
-            }
-          });
-        });
-
         document.getElementById('lobby-create-btn')?.addEventListener('click', () => {
-          net.createRoom(
+          const createBtn = document.getElementById('lobby-create-btn') as HTMLButtonElement;
+          if (createBtn) {
+            createBtn.disabled = true;
+            createBtn.innerText = 'INITIALIZING HOST...';
+          }
+          net.hostMatch(
             this.selectedGamerTag,
             this.selectedRig,
             this.selectedWeapon,
             this.selectedMap,
             this.selectedMode,
-            this.fillBots
-          );
+            this.fillBots,
+            this.teamSize
+          ).catch((err) => {
+            renderLobbyContent(undefined, `Failed to initialize host: ${err.message || err}`);
+          });
         });
 
         document.getElementById('lobby-join-btn')?.addEventListener('click', () => {
           const inputEl = document.getElementById('lobby-code-input') as HTMLInputElement;
-          const code = (inputEl?.value || '').trim().toUpperCase();
-          if (!code) return;
-          net.joinRoom(
+          const code = (inputEl?.value || '').trim();
+          if (!code || code.length !== 4) {
+            renderLobbyContent(undefined, 'Please enter a 4-digit room code from the host.');
+            return;
+          }
+          const joinBtn = document.getElementById('lobby-join-btn') as HTMLButtonElement;
+          if (joinBtn) {
+            joinBtn.disabled = true;
+            joinBtn.innerText = 'CONNECTING...';
+          }
+          net.joinMatch(
             code,
             this.selectedGamerTag,
             this.selectedRig,
             this.selectedWeapon
-          );
+          ).then((ok) => {
+            if (!ok) {
+              renderLobbyContent(undefined, `Could not connect to room ${code}. Verify 4-digit code or ensure both devices are on the same Wi-Fi / Mobile Hotspot.`);
+            }
+          });
         });
       }
     };
 
     renderLobbyContent();
 
-    net.connect().then((connected) => {
-      if (!connected) {
-        renderLobbyContent(undefined, `Unable to reach live arena server (${net.serverUrl}). Tap RETRY to reconnect.`);
-      }
-    });
-
     net.onRoomState = (state) => {
+      if (state.mode) this.selectedMode = state.mode;
+      if (state.mapId) this.selectedMap = state.mapId;
+      if (state.teamSize !== undefined) this.teamSize = state.teamSize;
+      if (state.fillBots !== undefined) this.fillBots = state.fillBots;
       renderLobbyContent(state);
     };
 
@@ -1146,6 +663,10 @@ export class MenuOverlay {
     };
 
     net.onMatchStarting = (data) => {
+      if (data.mode) this.selectedMode = data.mode;
+      if (data.mapId) this.selectedMap = data.mapId;
+      if (data.teamSize !== undefined) this.teamSize = data.teamSize;
+      if (data.fillBots !== undefined) this.fillBots = data.fillBots;
       let count = data.countdownSec || 3;
       overlay.innerHTML = `
         <div style="background: #090d16; border: 2px solid #22c55e; box-shadow: 0 0 50px rgba(34, 197, 94, 0.5); padding: 40px; text-align: center; border-radius: 8px;">
@@ -1169,9 +690,10 @@ export class MenuOverlay {
   }
 
   private startRadarAnimation(): void {
+    const theaterCanvas = document.getElementById('radar-canvas-theater') as HTMLCanvasElement;
     const kanoCanvas = document.getElementById('radar-canvas-kano') as HTMLCanvasElement;
     const lagosCanvas = document.getElementById('radar-canvas-lagos') as HTMLCanvasElement;
-    if (!kanoCanvas && !lagosCanvas) return;
+    if (!theaterCanvas && !kanoCanvas && !lagosCanvas) return;
 
     let sweepAngle = 0;
     let rainOffset = 0;
@@ -1179,6 +701,100 @@ export class MenuOverlay {
     const render = () => {
       sweepAngle += 0.04;
       rainOffset = (rainOffset + 2) % 30;
+
+      // 0. Active Theater Radar Screen (Top Right Dock)
+      if (theaterCanvas) {
+        const ctx = theaterCanvas.getContext('2d');
+        if (ctx) {
+          const w = theaterCanvas.width;
+          const h = theaterCanvas.height;
+          const cx = w * 0.5;
+          const cy = h * 0.5;
+
+          ctx.fillStyle = '#030705';
+          ctx.fillRect(0, 0, w, h);
+
+          if (this.selectedMap === MapId.BIRNIN_KANO) {
+            // Citadel Radar
+            ctx.strokeStyle = 'rgba(34, 197, 94, 0.2)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < w; x += 22) {
+              ctx.beginPath();
+              ctx.moveTo(x, 0);
+              ctx.lineTo(x, h);
+              ctx.stroke();
+            }
+            [18, 32, 48].forEach((r) => {
+              ctx.beginPath();
+              ctx.arc(cx, cy, r, 0, Math.PI * 2);
+              ctx.stroke();
+            });
+
+            // Sweep
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(sweepAngle);
+            const grad = ctx.createLinearGradient(0, 0, 50, 0);
+            grad.addColorStop(0, 'rgba(34, 197, 94, 0.6)');
+            grad.addColorStop(1, 'rgba(0, 135, 81, 0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, 50, 0, 0.45);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            // Blips
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.font = 'bold 8px monospace';
+            ctx.fillText('VAULT', cx + 6, cy + 3);
+
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(cx - 30, cy - 12, 3, 3);
+            ctx.fillRect(cx + 38, cy + 14, 3, 3);
+          } else {
+            // Lagos 3rd Mainland Expressway Radar
+            ctx.strokeStyle = '#008751';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(0, 20);
+            ctx.lineTo(w, 20);
+            ctx.moveTo(0, 50);
+            ctx.lineTo(w, 50);
+            ctx.stroke();
+
+            // Lane dashes
+            ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
+            ctx.setLineDash([8, 8]);
+            ctx.beginPath();
+            ctx.moveTo(0, 35);
+            ctx.lineTo(w, 35);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Rain streaks
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+            for (let rx = 10; rx < w; rx += 25) {
+              const ry = (rx * 1.5 + rainOffset * 3) % h;
+              ctx.beginPath();
+              ctx.moveTo(rx, ry);
+              ctx.lineTo(rx - 5, ry + 10);
+              ctx.stroke();
+            }
+
+            // Moving convoy blips
+            const busX = (sweepAngle * 40) % (w + 40) - 20;
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(busX, 32, 12, 6);
+            ctx.font = 'bold 8px monospace';
+            ctx.fillText('3RD MAINLAND CONVOY', 10, 12);
+          }
+        }
+      }
 
       // 1. Birnin Kano Radar Sweep (Phosphor Night-Vision Military Green #22C55E / #008751)
       if (kanoCanvas) {

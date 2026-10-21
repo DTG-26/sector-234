@@ -17,6 +17,7 @@ export class RemotePlayerController {
   private targetIsGrounded: boolean;
   private targetIsSliding: boolean;
   private lastDamageTime: number = 0;
+  private extrapolateTime: number = 0;
 
   constructor(player: Player, particles: ParticleSystem3D) {
     this.player = player;
@@ -35,7 +36,9 @@ export class RemotePlayerController {
 
   public applySnapshot(state: NetworkPlayerState): void {
     const now = performance.now();
+    const wasDead = this.player.stats.isDead || this.player.mesh.isRagdoll;
 
+    this.extrapolateTime = 0;
     this.targetX = state.x;
     this.targetY = state.y;
     this.targetVx = state.vx;
@@ -46,9 +49,27 @@ export class RemotePlayerController {
     this.targetIsGrounded = state.isGrounded;
     this.targetIsSliding = state.isSliding;
 
+    // Resurrect remote player if alive again (prevents stuck ragdoll / invisibility bug)
+    if (!state.isDead && wasDead) {
+      this.player.stats.isDead = false;
+      this.player.actor.isDead = false;
+      this.player.mesh.isRagdoll = false;
+      this.player.actor.position.set(state.x, state.y, 0);
+      this.player.actor.velocity.set(state.vx, state.vy, 0);
+      this.player.mesh.rootGroup.position.set(state.x, state.y, 0);
+      this.player.mesh.rootGroup.rotation.set(0, 0, 0);
+      this.player.mesh.rootGroup.visible = true;
+      this.player.mesh.statusSprite.visible = true;
+      this.player.respawn(state.x, state.y);
+    } else if (state.isDead && !wasDead) {
+      this.player.stats.isDead = true;
+      this.player.actor.isDead = true;
+      this.player.mesh.triggerRagdoll(state.vx * 0.5, 8.0);
+    }
+
     // Health Reconciliation:
     // If local player recently dealt damage to this remote player (< 600ms),
-    // don't let stale snapshots from the server bounce their HP back up!
+    // don't let stale snapshots from the network bounce their HP back up
     const recentLocalDamage = (now - this.lastDamageTime) < 600;
     if (!recentLocalDamage || state.hp <= this.player.stats.hp) {
       this.player.stats.hp = state.hp;
@@ -70,43 +91,67 @@ export class RemotePlayerController {
   }
 
   public update(dt: number): void {
-    if (this.player.stats.isDead) return;
-
-    // 1. DEAD RECKONING: Extrapolate target position using current velocity
-    // Between network snapshots (every 28-35ms), remote players NEVER stop or stutter!
-    this.targetX += this.targetVx * dt;
-    this.targetY += this.targetVy * dt;
-
-    if (!this.targetIsGrounded && !this.targetIsJetFlying) {
-      // Natural aerial gravity so airborne opponents curve and fall smoothly
-      this.targetVy -= 28.0 * dt;
+    if (this.player.stats.isDead) {
+      // Continue updating ragdoll physics while dead so it falls cleanly
+      if (this.player.mesh.isRagdoll) {
+        this.player.mesh.update(
+          dt,
+          this.player.actor.position.x,
+          this.player.actor.position.y,
+          0,
+          0,
+          false,
+          0
+        );
+      }
+      return;
     }
 
-    // 2. Adaptive Smooth Positional Convergence
+    // Safeguard: Ensure mesh is never stuck in ragdoll or hidden while alive
+    if (this.player.mesh.isRagdoll) {
+      this.player.mesh.isRagdoll = false;
+      this.player.mesh.rootGroup.rotation.set(0, 0, 0);
+    }
+    this.player.mesh.rootGroup.visible = true;
+    this.player.mesh.statusSprite.visible = true;
+    this.player.mesh.rootGroup.position.z = 0; // Lock to 2D gameplay plane to prevent Z-depth clipping
+
+    // 1. DEAD RECKONING with extrapolation window limit (caps drift on packet jitter)
+    this.extrapolateTime += dt;
+    if (this.extrapolateTime < 0.12) {
+      this.targetX += this.targetVx * dt;
+      this.targetY += this.targetVy * dt;
+
+      if (!this.targetIsGrounded && !this.targetIsJetFlying) {
+        // Natural aerial gravity for smooth arcs
+        this.targetVy -= 28.0 * dt;
+      }
+    }
+
+    // 2. Exponential Frame-Rate Independent Smoothing (Zero micro-stutter)
     const dx = this.targetX - this.player.actor.position.x;
     const dy = this.targetY - this.player.actor.position.y;
     const distSq = dx * dx + dy * dy;
 
     if (distSq > 36.0) {
-      // Hard snap on large teleport / respawn (> 6 meters)
+      // Hard snap only on respawn / teleport (> 6 meters)
       this.player.actor.position.x = this.targetX;
       this.player.actor.position.y = this.targetY;
     } else {
-      // Smooth adaptive lerp: higher convergence rate if falling behind, silky smooth glide when close
-      const lerpSpeed = distSq > 1.5 ? 26.0 : 16.0;
-      const factor = Math.min(1.0, dt * lerpSpeed);
-      this.player.actor.position.x += dx * factor;
-      this.player.actor.position.y += dy * factor;
+      const blend = 1.0 - Math.exp(-22.0 * dt);
+      this.player.actor.position.x += (this.targetX - this.player.actor.position.x) * blend;
+      this.player.actor.position.y += (this.targetY - this.player.actor.position.y) * blend;
     }
 
     this.player.actor.velocity.x = this.targetVx;
     this.player.actor.velocity.y = this.targetVy;
 
-    // 3. Smooth Aim Angle Interpolation
+    // 3. Shortest Angular Aim Interpolation
     let diff = this.targetAimAngle - this.currentAimAngle;
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
-    this.currentAimAngle += diff * Math.min(1.0, dt * 25.0);
+    const aimBlend = 1.0 - Math.exp(-25.0 * dt);
+    this.currentAimAngle += diff * aimBlend;
 
     // 4. Update 3D Articulated Operator Mesh
     this.player.mesh.update(

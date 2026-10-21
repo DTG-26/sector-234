@@ -393,12 +393,26 @@ export class HeistModeManager {
         this.extractionProgress.set(holder.stats.id, prog);
 
         if (prog >= 5.0) {
-          this.handleCleanEvac(holder);
+          this.handleCleanEvac(holder, players);
         }
       } else if (inZonePlayers.length > 1) {
-        // Contested! Multiple operatives fighting inside ring
-        this.isExtractionContested = true;
-        this.contestedWarningTime = 1.0;
+        // Check if all players in zone are from the SAME friendly team (e.g. 2 Blue teammates)
+        const distinctTeams = new Set(inZonePlayers.map((p) => p.stats.team).filter((t) => t !== 'none'));
+        if (distinctTeams.size === 1) {
+          // Friendly squad holding pad together: NOT contested!
+          this.isExtractionContested = false;
+          const holder = inZonePlayers[0];
+          const prog = (this.extractionProgress.get(holder.stats.id) || 0) + dt;
+          this.extractionProgress.set(holder.stats.id, prog);
+
+          if (prog >= 5.0) {
+            this.handleCleanEvac(holder, players);
+          }
+        } else {
+          // Rivals fighting inside the extraction ring
+          this.isExtractionContested = true;
+          this.contestedWarningTime = 1.0;
+        }
       } else {
         this.isExtractionContested = false;
       }
@@ -410,13 +424,22 @@ export class HeistModeManager {
     }
   }
 
-  private handleCleanEvac(player: Player): void {
+  private handleCleanEvac(player: Player, allPlayers: Player[] = []): void {
     this.currentAct = HeistAct.MATCH_OVER;
     player.stats.isExtracted = true;
 
     // Bank 100% match cash + ₦250,000 Heist Bonus into Offshore Vault
     const totalPayout = player.stats.cash + 250000;
     OperativeService.getInstance().bankMatchCash(totalPayout);
+
+    // If team squad heist, all teammates win!
+    if (player.stats.team !== 'none' && allPlayers.length > 0) {
+      allPlayers.forEach((p) => {
+        if (p.stats.team === player.stats.team) {
+          p.stats.isExtracted = true;
+        }
+      });
+    }
 
     this.announcer.announce(AnnouncerEvent.CLEAN_EVAC);
   }

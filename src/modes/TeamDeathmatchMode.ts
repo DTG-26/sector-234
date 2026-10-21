@@ -57,6 +57,7 @@ export class TeamDeathmatchMode {
 
   public isFriendlyFire(p1: Player, p2: Player): boolean {
     if (!p1.stats.team || !p2.stats.team) return false;
+    if (p1.stats.team === 'none' || p2.stats.team === 'none') return false;
     return p1.stats.team === p2.stats.team;
   }
 }

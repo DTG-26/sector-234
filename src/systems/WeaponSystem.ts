@@ -103,6 +103,11 @@ export class WeaponSystem {
     const muzzleX = shooterOriginX + Math.cos(aimAngle) * 0.25;
     const muzzleY = shooterOriginY + Math.sin(aimAngle) * 0.25;
 
+    const localP = allPlayers?.find((p) => p.stats.isLocalPlayer);
+    const isEnemyBullet = localP && localP.stats.team && player.stats.team && localP.stats.team !== 'none' && player.stats.team !== 'none'
+      ? localP.stats.team !== player.stats.team
+      : !player.stats.isLocalPlayer;
+
     for (let p = 0; p < pelletCount; p++) {
       const proj = new Projectile3D(
         this.scene,
@@ -111,7 +116,7 @@ export class WeaponSystem {
         muzzleX,
         muzzleY,
         aimAngle,
-        player.stats.isBot,
+        isEnemyBullet,
         shooterOriginX,
         shooterOriginY
       );
@@ -221,8 +226,15 @@ export class WeaponSystem {
         },
         (target, dmg) => {
           const attacker = players.find((p) => p.stats.id === proj.shooterId);
-          // Friendly fire immunity for Team Deathmatch
-          if (attacker && attacker.stats.team && target.stats.team && attacker.stats.team === target.stats.team) {
+          // Friendly fire immunity for Team Deathmatch (only when both have a valid non-'none' team)
+          if (
+            attacker &&
+            attacker.stats.team &&
+            target.stats.team &&
+            attacker.stats.team !== 'none' &&
+            target.stats.team !== 'none' &&
+            attacker.stats.team === target.stats.team
+          ) {
             return;
           }
           const died = target.takeDamage(dmg, attacker);

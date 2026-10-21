@@ -118,12 +118,32 @@ export class HUDCanvas {
 
     let modeLabel = mode.currentMode.replace('_', ' ');
     if (mode.heistMode) {
+      const isSquad = !!(player.stats.team && player.stats.team !== 'none');
       if (mode.heistMode.currentAct === HeistAct.ACT_1_BREACH) {
-        modeLabel = `ACT I: VAULT (${Math.round(mode.heistMode.vaultHP)} HP)`;
+        modeLabel = isSquad
+          ? `2v2 SQUAD HEIST: BREACH VAULT (${Math.round(mode.heistMode.vaultHP)} HP)`
+          : `ACT I: VAULT (${Math.round(mode.heistMode.vaultHP)} HP)`;
       } else if (mode.heistMode.currentAct === HeistAct.ACT_2_CARRIER) {
-        modeLabel = `ACT II: SARKI CARRIER`;
+        const carrier = mode.players.find((p) => p.stats.id === mode.heistMode?.carrierId);
+        if (carrier && isSquad) {
+          if (carrier.stats.id === player.stats.id) {
+            modeLabel = `⭐ YOU HAVE THE ODOGWU STASH! EVAC!`;
+          } else if (carrier.stats.team === player.stats.team) {
+            modeLabel = `🛡️ SQUADMATE HAS THE STASH! ESCORT!`;
+          } else {
+            modeLabel = `⚠️ ENEMY SQUAD HAS THE STASH! INTERCEPT!`;
+          }
+        } else {
+          modeLabel = `ACT II: SARKI CARRIER`;
+        }
       } else if (mode.heistMode.currentAct === HeistAct.ACT_3_EXTRACTION) {
-        modeLabel = mode.heistMode.isExtractionContested ? `⚠️ LZ CONTESTED!` : `ACT III: CHOPPER EVAC`;
+        if (mode.heistMode.isExtractionContested) {
+          modeLabel = `⚠️ LZ CONTESTED BY ENEMY!`;
+        } else if (mode.heistMode.extractionProgress.has(player.stats.id)) {
+          modeLabel = `🚁 YOU ARE EXTRACTING! HOLD ZONE!`;
+        } else {
+          modeLabel = isSquad ? `ACT III: SQUAD CHOPPER EVAC` : `ACT III: CHOPPER EVAC`;
+        }
       }
     } else if (mode.tdmMode) {
       modeLabel = `TEAM DEATHMATCH (TARGET: ${mode.tdmMode.targetScore})`;
@@ -159,6 +179,12 @@ export class HUDCanvas {
       ctx.font = `800 ${isMobile ? 13 : 15}px "JetBrains Mono", monospace`;
       ctx.textAlign = 'center';
       ctx.fillText(`${timeStr}  •  KILLS: ${player.stats.kills}/${mode.ffaMode.targetKills}`, w * 0.5, isMobile ? 29 : 32);
+    } else if (mode.heistMode && player.stats.team && player.stats.team !== 'none') {
+      ctx.fillStyle = timeRemaining <= 30 ? '#ef4444' : '#38bdf8';
+      ctx.font = `800 ${isMobile ? 12 : 14}px "JetBrains Mono", monospace`;
+      ctx.textAlign = 'center';
+      const myTeam = (player.stats.team || 'blue').toUpperCase();
+      ctx.fillText(`${timeStr}  •  [${myTeam} SQUAD 2v2]`, w * 0.5, isMobile ? 29 : 32);
     } else {
       ctx.fillStyle = timeRemaining <= 30 ? '#ef4444' : '#f8fafc';
       ctx.font = `800 ${isMobile ? 14 : 16}px "JetBrains Mono", monospace`;

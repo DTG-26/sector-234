@@ -116,10 +116,12 @@ export class ModeManager {
       true,
       localRig
     );
-    if (modeType === GameModeType.TEAM_DEATHMATCH) {
-      localPlayer.stats.team = 'blue';
+    const isTeamPlay = modeType === GameModeType.TEAM_DEATHMATCH || ((modeType === GameModeType.ODOGWU_STASH || modeType === GameModeType.VAULT_HEIST) && teamSize > 1);
+
+    if (isTeamPlay) {
+      localPlayer.setTeam('blue', true);
     } else {
-      localPlayer.stats.team = 'none';
+      localPlayer.setTeam('none', true);
     }
     this.players.push(localPlayer);
 
@@ -150,7 +152,7 @@ export class ModeManager {
       ];
 
       const botConfigs = mapId === MapId.LAGOS_GOSLOW ? botConfigsLagos : botConfigsKano;
-      const totalDesired = modeType === GameModeType.TEAM_DEATHMATCH ? (teamSize * 2 - 1) : 5;
+      const totalDesired = isTeamPlay ? (teamSize * 2 - 1) : 5;
 
       for (let i = 0; i < totalDesired; i++) {
         const cfg = botConfigs[i % botConfigs.length];
@@ -159,11 +161,12 @@ export class ModeManager {
         bot.stats.activeWeapon = cfg.weapon;
         bot.mesh.setWeapon(cfg.weapon);
 
-        if (modeType === GameModeType.TEAM_DEATHMATCH) {
+        if (isTeamPlay) {
           // Local player is on Blue (1 member). Need (teamSize - 1) Blue bots, rest Red.
-          bot.stats.team = (i < teamSize - 1) ? 'blue' : 'red';
+          const isBlue = i < teamSize - 1;
+          bot.setTeam(isBlue ? 'blue' : 'red', isBlue);
         } else {
-          bot.stats.team = 'none';
+          bot.setTeam('none', false);
         }
 
         this.players.push(bot);
@@ -227,7 +230,8 @@ export class ModeManager {
     networkPlayers: NetworkLobbyPlayer[],
     particles: ParticleSystem3D,
     fillBots: boolean = true,
-    teamSize: number = 3
+    teamSize: number = 3,
+    isHost: boolean = false
   ): Player {
     this.cleanup();
     this.currentMode = modeType;
@@ -276,6 +280,13 @@ export class ModeManager {
       true,
       localRig
     );
+    const isTeamPlay = modeType === GameModeType.TEAM_DEATHMATCH || ((modeType === GameModeType.ODOGWU_STASH || modeType === GameModeType.VAULT_HEIST) && teamSize > 1);
+
+    if (isTeamPlay) {
+      localPlayer.setTeam('blue', true);
+    } else {
+      localPlayer.setTeam('none', true);
+    }
     this.players.push(localPlayer);
 
     // 2. Add Remote Human Players
@@ -296,15 +307,24 @@ export class ModeManager {
       remotePlayer.stats.primaryWeapon = np.primaryWeapon;
       remotePlayer.stats.activeWeapon = np.primaryWeapon;
       remotePlayer.mesh.setWeapon(np.primaryWeapon);
+      if (isTeamPlay) {
+        const blueCount = this.players.filter((p) => p.stats.team === 'blue').length;
+        const isBlue = blueCount < teamSize;
+        remotePlayer.setTeam(isBlue ? 'blue' : 'red', isBlue);
+      } else {
+        remotePlayer.setTeam('none', false);
+      }
       this.players.push(remotePlayer);
 
       const controller = new RemotePlayerController(remotePlayer, particles);
       this.remoteControllers.set(np.id, controller);
     });
 
-    // 3. Fill remaining slots with Bots up to 6 players total ONLY if fillBots is enabled
-    if (fillBots) {
-      const neededBots = Math.max(0, 6 - this.players.length);
+    // 3. Fill remaining slots with Bots ONLY on the authoritative Host
+    // Clients receive bots via Host snapshots to eliminate desync
+    if (fillBots && isHost) {
+      const targetTotal = isTeamPlay ? teamSize * 2 : 6;
+      const neededBots = Math.max(0, targetTotal - this.players.length);
       const botPool =
         mapId === MapId.LAGOS_GOSLOW
           ? [
@@ -330,6 +350,13 @@ export class ModeManager {
         bot.stats.primaryWeapon = cfg.weapon;
         bot.stats.activeWeapon = cfg.weapon;
         bot.mesh.setWeapon(cfg.weapon);
+        if (isTeamPlay) {
+          const blueCount = this.players.filter((p) => p.stats.team === 'blue').length;
+          const isBlue = blueCount < teamSize;
+          bot.setTeam(isBlue ? 'blue' : 'red', isBlue);
+        } else {
+          bot.setTeam('none', false);
+        }
         this.players.push(bot);
 
         const ai = new BotAI(bot);

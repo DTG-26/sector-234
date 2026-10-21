@@ -30,6 +30,7 @@ export class Player {
   public healthRegenDelay: number = 0;
   public c4RegenTimer: number = 0;
   public lastDamageTakenTime: number = 0;
+  public lastAimAngle: number = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -88,6 +89,12 @@ export class Player {
     this.syncStatusBillboard();
   }
 
+  public setTeam(team: 'blue' | 'red' | 'none', isAlly: boolean): void {
+    this.stats.team = team;
+    this.mesh.setTeam(team, isAlly);
+    this.syncStatusBillboard();
+  }
+
   public syncStatusBillboard(): void {
     this.mesh.updateStatusBillboard(
       this.stats.hp,
@@ -117,6 +124,7 @@ export class Player {
     this.stats.hp = Math.max(0, this.stats.hp - amount);
     this.healthRegenDelay = 3.5; // Reset 3.5s cooldown before health regeneration begins
     this.lastDamageTakenTime = performance.now();
+    this.mesh.triggerDamageFlash();
     this.syncStatusBillboard();
 
     if (this.stats.hp <= 0) {
@@ -160,10 +168,7 @@ export class Player {
     this.stats.c4Count = 4;
     this.c4RegenTimer = 0;
     this.jetFuel = this.maxJetFuel;
-    this.mesh.isRagdoll = false;
-    this.mesh.statusSprite.visible = true;
-    this.mesh.rootGroup.rotation.set(0, 0, 0);
-    this.mesh.rootGroup.position.set(x, y, 0);
+    this.mesh.resetFromRagdoll(x, y);
     this.syncStatusBillboard();
   }
 
@@ -282,7 +287,13 @@ export class Player {
     if (allPlayers) {
       for (const other of allPlayers) {
         if (other.stats.id === this.stats.id || other.stats.isDead) continue;
-        if (this.stats.team && other.stats.team && this.stats.team === other.stats.team) continue;
+        if (
+          this.stats.team &&
+          other.stats.team &&
+          this.stats.team !== 'none' &&
+          other.stats.team !== 'none' &&
+          this.stats.team === other.stats.team
+        ) continue;
         const dx = other.actor.position.x - this.actor.position.x;
         const dy = (other.actor.position.y + 0.95) - (this.actor.position.y + 0.95);
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -318,6 +329,7 @@ export class Player {
   }
 
   public update(dt: number, tileMap: TileMap3D, rigSystem: RigSystem, aimAngle: number): void {
+    this.lastAimAngle = aimAngle;
     if (this.stats.isDead) {
       this.mesh.update(dt, this.actor.position.x, this.actor.position.y, 0, 0, false, 0);
       return;

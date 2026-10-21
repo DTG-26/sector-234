@@ -41,6 +41,7 @@ export class TileMap3D {
   private debrisGeometries: THREE.BufferGeometry[] = [];
 
   public onBlackoutTriggered?: () => void;
+  public onTileDestroyed?: (x: number, y: number, type: TileType) => void;
 
   constructor(scene: THREE.Scene, width: number = ARENA_CONFIG.GRID_WIDTH, height: number = ARENA_CONFIG.GRID_HEIGHT) {
     this.scene = scene;
@@ -695,6 +696,10 @@ export class TileMap3D {
     if (this.tileMeshes[index]) {
       this.group.remove(this.tileMeshes[index]!);
       this.tileMeshes[index] = null;
+    }
+
+    if (this.onTileDestroyed) {
+      this.onTileDestroyed(x, y, type);
     }
   }
 
