@@ -54,12 +54,16 @@ export class NetworkClient {
     const envUrl = (import.meta as any).env?.VITE_WS_URL || (window as any).__XAG_WS_URL__;
     if (envUrl) {
       this.serverUrl = envUrl;
-    } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      // In local dev on desktop, default to local port 8080 (falls back to Railway if local server is down)
-      this.serverUrl = 'ws://localhost:8080';
+    } else if (typeof window !== 'undefined' && window.location) {
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (isLocalhost && window.location.port !== '8080') {
+        this.serverUrl = 'ws://localhost:8080';
+      } else {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        this.serverUrl = `${protocol}//${window.location.host}`;
+      }
     } else {
-      // For any cloud or mobile client, ALWAYS connect via secure WebSocket (wss://) to Railway
-      this.serverUrl = 'wss://sector-234-production.up.railway.app';
+      this.serverUrl = 'ws://localhost:8080';
     }
   }
 
@@ -84,11 +88,6 @@ export class NetworkClient {
       const timeoutId = setTimeout(() => {
         if (!hasResolved) {
           console.warn('[NET-CLIENT] Connection attempt timed out.');
-          if (this.serverUrl.includes('localhost')) {
-            this.serverUrl = 'wss://sector-234-production.up.railway.app';
-            this.connect().then(safeResolve);
-            return;
-          }
           safeResolve(false);
         }
       }, 7000);
@@ -97,11 +96,6 @@ export class NetworkClient {
         this.ws = new WebSocket(this.serverUrl);
       } catch (e) {
         console.error('[NET-CLIENT] WebSocket instantiation failed:', e);
-        if (this.serverUrl !== 'wss://sector-234-production.up.railway.app') {
-          this.serverUrl = 'wss://sector-234-production.up.railway.app';
-          this.connect().then(safeResolve);
-          return;
-        }
         safeResolve(false);
         return;
       }
