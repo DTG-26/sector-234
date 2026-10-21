@@ -305,9 +305,13 @@ export class HeistModeManager {
     }
 
     // 4. If victim was the Sarki Carrier, drop the case!
+    this.handlePlayerDeath(victim);
+  }
+
+  public handlePlayerDeath(victim: Player): void {
+    victim.mesh.setOdogwuCrown(false);
     if (this.carrierId === victim.stats.id) {
       this.dropMasterCase(victim.actor.position.x, victim.actor.position.y);
-      victim.mesh.setOdogwuCrown(false);
     }
   }
 
@@ -354,7 +358,12 @@ export class HeistModeManager {
             this.passiveDripTimer = 0;
           }
         } else {
-          this.carrierId = null;
+          // Carrier eliminated or disconnected: drop case right at death location & clear crown
+          if (carrier) {
+            this.handlePlayerDeath(carrier);
+          } else {
+            this.dropMasterCase(this.masterCasePos.x, this.masterCasePos.y);
+          }
         }
       } else if (this.isCaseSpawned && this.masterCaseMesh.visible) {
         // Check if any player touches case

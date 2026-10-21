@@ -146,6 +146,7 @@ export class Player {
     this.actor.isDead = true;
     this.respawnTimer = 3.5;
     this.stats.deaths++;
+    this.mesh.setOdogwuCrown(false); // Drop Odogwu crown immediately on death!
 
     const impulseX = attacker ? (this.actor.position.x - attacker.actor.position.x) * 10.0 : (Math.random() - 0.5) * 18.0;
     const impulseY = 14.0 + Math.random() * 8.0;
@@ -169,6 +170,7 @@ export class Player {
     this.c4RegenTimer = 0;
     this.jetFuel = this.maxJetFuel;
     this.mesh.resetFromRagdoll(x, y);
+    this.mesh.setOdogwuCrown(false); // Ensure crown never sticks to respawned players
     this.syncStatusBillboard();
   }
 

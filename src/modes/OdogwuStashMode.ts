@@ -64,13 +64,13 @@ export class OdogwuStashMode {
       this.matchTimeRemaining -= dt;
     }
 
-    // 1. Determine Current Odogwu (#1 Richest Player)
+    // 1. Determine Current Odogwu (#1 Richest Living Player)
     let richest: Player | null = null;
     let maxCash = -1;
 
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
-      if (p.stats.cash > maxCash) {
+      if (!p.stats.isDead && p.stats.cash > maxCash) {
         maxCash = p.stats.cash;
         richest = p;
       }
@@ -79,7 +79,12 @@ export class OdogwuStashMode {
     if (richest) {
       this.currentOdogwuId = richest.stats.id;
       players.forEach((p) => {
-        p.mesh.setOdogwuCrown(p.stats.id === richest!.stats.id);
+        p.mesh.setOdogwuCrown(!p.stats.isDead && p.stats.id === richest!.stats.id);
+      });
+    } else {
+      this.currentOdogwuId = null;
+      players.forEach((p) => {
+        p.mesh.setOdogwuCrown(false);
       });
     }
 

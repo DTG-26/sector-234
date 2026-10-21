@@ -433,13 +433,19 @@ export class ModeManager {
       this.ffaMode.recordKill(victim, killer);
     }
 
-    if (killer && this.heistMode) {
-      this.heistMode.handleKill(killer, victim);
+    if (this.heistMode) {
+      if (killer) {
+        this.heistMode.handleKill(killer, victim);
+      } else {
+        this.heistMode.handlePlayerDeath(victim);
+      }
     }
 
     if (this.odogwuMode) {
       this.odogwuMode.handlePlayerElimination(victim, killer, this.scene, this.pickups);
     }
+
+    victim.mesh.setOdogwuCrown(false);
 
     // Drop physical ₦50,000 cash bundle loot right at victim's death location!
     const loot = new Pickup3D(
